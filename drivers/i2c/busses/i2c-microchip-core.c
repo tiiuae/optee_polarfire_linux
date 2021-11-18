@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Microchip I2C controller driver
+ * Microchip corei2c I2C controller driver
  *
  * Copyright (c) 2018 - 2021 Microchip Corporation. All rights reserved.
  *

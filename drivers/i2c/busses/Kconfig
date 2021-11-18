@@ -747,12 +747,6 @@ config I2C_MESON
 	  If you say yes to this option, support will be included for the
 	  I2C interface on the Amlogic Meson family of SoCs.
 
-config I2C_MICROCHIP
-	tristate "Microchip I2C"
-	help
-	  If you say yes to this option, support will be included for the
-	  Microchip I2C interface.
-
 config I2C_MPC
 	tristate "MPC107/824x/85xx/512x/52xx/83xx/86xx"
 	depends on PPC
@@ -880,6 +874,12 @@ config I2C_PNX
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-pnx.
+
+config I2C_MICROCHIP_CORE
+	tristate "Microchip FPGA I2C"
+	help
+	  If you say yes to this option, support will be included for the
+	  I2C interface on Microchip FPGAs.
 
 config I2C_PXA
 	tristate "Intel PXA2XX I2C adapter"
