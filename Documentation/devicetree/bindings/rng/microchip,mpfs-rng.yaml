@@ -9,33 +9,28 @@ title: Microchip MPFS random number generator
 maintainers:
   - Conor Dooley <conor.dooley@microchip.com>
 
+description: |
+  The hardware random number generator on the Polarfire SoC is
+  accessed via the mailbox interface provided by the system controller
+
+
 properties:
   compatible:
-    const: microchip,polarfire-soc-rng
+    const: microchip,mpfs-rng
 
-  syscontroller:
-    maxItems: 1
-    description: name of the system controller device node
-
-  "#address-cells":
-    const: 1
-
-  "#size-cells":
-    const: 1
+  microchip,syscontroller:
+    description: phandle of the system controller device node
+    $ref: "/schemas/types.yaml#/definitions/phandle"
 
 required:
   - compatible
-  - "#address-cells"
-  - "#size-cells"
-  - "syscontroller"
+  - microchip,syscontroller
 
 additionalProperties: false
 
 examples:
   - |
     hwrandom: hwrandom {
-        compatible = "microchip,polarfire-soc-rng";
-        #address-cells = <1>;
-        #size-cells = <1>;
-        syscontroller = <&syscontroller>;
+        compatible = "microchip,mpfs-rng";
+        microchip,syscontroller = <&syscontroller>;
     };
