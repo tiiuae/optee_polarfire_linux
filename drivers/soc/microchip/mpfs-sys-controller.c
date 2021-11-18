@@ -101,9 +101,6 @@ EXPORT_SYMBOL(mpfs_sys_controller_get);
 
 static const struct of_device_id mpfs_sys_controller_of_match[] = {
 	{
-		.compatible = "microchip,polarfire-soc-sys-controller",
-	},
-	{
 		.compatible = "microchip,mpfs-sys-controller",
 	},
 	{},
