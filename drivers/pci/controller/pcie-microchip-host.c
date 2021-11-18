@@ -1027,9 +1027,9 @@ static int mc_platform_init(struct pci_config_window *cfg)
 	val = 0;
 	writel_relaxed(val, bridge_base_addr + IMASK_LOCAL);
 
-	ret = of_property_read_u64(dev->of_node, "mchp,axi-m-atr0", &atr0_addr);
+	ret = of_property_read_u64(dev->of_node, "microchip,axi-m-atr0", &atr0_addr);
 	if (ret) {
-		dev_err(dev, "missing mchp,axi-m-atr0 property\n");
+		dev_err(dev, "missing microchip,axi-m-atr0 property\n");
 		return ret;
 	}
 
