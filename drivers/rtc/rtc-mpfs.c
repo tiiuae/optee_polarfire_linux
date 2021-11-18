@@ -369,7 +369,7 @@ static int __init mpfs_rtc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = of_property_read_u32(pdev->dev.of_node, "prescaler", &rtcdev->prescaler);
+	ret = of_property_read_u32(pdev->dev.of_node, "microchip,prescaler", &rtcdev->prescaler);
 	if (ret)
 		rtcdev->prescaler = DEFAULT_PRESCALER;
 
