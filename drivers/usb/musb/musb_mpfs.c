@@ -302,7 +302,7 @@ static SIMPLE_DEV_PM_OPS(pf_pm_ops, pf_suspend, pf_resume);
 
 #ifdef IS_ENABLED(CONFIG_OF)
 static const struct of_device_id pf_id_table[] = {
-	{ .compatible = "microchip,mpfs-usb-host" },
+	{ .compatible = "microchip,mpfs-musb" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, pf_id_table);
