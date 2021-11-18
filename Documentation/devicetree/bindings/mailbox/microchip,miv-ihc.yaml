@@ -11,7 +11,7 @@ maintainers:
   - Conor Dooley <Conor Dooley <conor.dooley@microchip.com>>
 
 description: |
-  The Mi-V Inter-hart Communication (IHC) subsystem is used to exchage
+  The Mi-V Inter-hart Communication (IHC) subsystem is used to exchange
   data between harts in PolarFire SoC. It provides the ability to
   send messages (ie. data, status and control) and coordinate between
   harts through a non-blocking interrupt signaling mechanism.
@@ -21,17 +21,19 @@ properties:
     const: microchip,miv-ihc
 
   interrupts:
-    description: Should contain the IHC interrupt associated with the lowest
-    hart ID in the local software context.
+    description: |
+      Should contain the IHC interrupt associated with the lowest
+      hart ID in the local software context.
     maxItems: 1
 
-  miv-ihc,remote-context-id:
+  microchip,miv-ihc-remote-context-id:
     $ref: /schemas/types.yaml#/definitions/uint32
     enum: [5, 6]
+    default: 6
     description: |
       ID of the software context where data should be sent to.
       Should be either a value of 5 (Context A) or 6 (Context B).
-      A default value of 6 should be used to match default IHC configuration 
+      A default value of 6 should be used to match default IHC configuration
       (Linux on context A and RTOS/BM on context B).
 
   "#mbox-cells":
@@ -41,20 +43,17 @@ required:
   - compatible
   - interrupts
   - "#mbox-cells"
-  - miv-ihc,remote-context-id
+  - microchip,miv-ihc-remote-context-id
 
 additionalProperties: false
 
 examples:
   - |
-    soc {
-      #address-cells = <2>;
-      #size-cells = <2>;
-      ihc: ihc {
-        compatible = "microchip,miv-ihc";
-        interrupt-parent = <&plic>;
-        interrupts = <IHC_HART1_INT>;
-        miv-ihc,remote-context-id = <IHC_CONTEXT_B>;
-        #mbox-cells = <1>;
-      };
+    #include "dt-bindings/mailbox/miv-ihc.h"
+    ihc: mailbox {
+      compatible = "microchip,miv-ihc";
+      interrupt-parent = <&plic>;
+      interrupts = <IHC_HART1_INT>;
+      microchip,miv-ihc-remote-context-id = <IHC_CONTEXT_B>;
+      #mbox-cells = <1>;
     };
