@@ -153,11 +153,6 @@ static int mchp_core_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	int ret;
 	u8 channel = pwm->hwpwm;
 
-	if (!OUTPUT_MAPPED(mchp_core_pwm->mapped_outputs, channel)) {
-		dev_warn_once(chip->dev, "output is not mapped to io\n");
-		return -EINVAL;
-	}
-
 	pwm_get_state(pwm, &current_state);
 
 	if (desired_state->enabled) {
@@ -211,12 +206,6 @@ static void mchp_core_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pw
 	u16 ch_enabled;
 	u32 channel_offset = (pwm->hwpwm) * 0x8U;
 	u8 channel = pwm->hwpwm;
-
-	if (!OUTPUT_MAPPED(mchp_core_pwm->mapped_outputs, channel)) {
-		dev_warn_once(chip->dev, "output is not mapped to io\n");
-		state->enabled = false;
-		return;
-	}
 
 	ch_enabled = (u16)(
 		(readl_relaxed(mchp_core_pwm->base + PWM_EN_HIGH) << 8) |
@@ -311,22 +300,12 @@ static int mchp_core_pwm_probe(struct platform_device *pdev)
 	if (ret < 0) {
 		dev_err(&pdev->dev, "failed to add PWM chip %d\n", ret);
 	}
-	
-	ret = of_property_read_u16(pdev->dev.of_node, "mchp,mapped-outputs",
-				   &mchp_pwm->mapped_outputs);
-	if (ret) {
-		dev_err(&pdev->dev,
-			"Failed to find mapped outputs\n");
-		return -ENODEV;
-	}
 
 	writel_relaxed(0U, mchp_pwm->base + PWM_EN_LOW);
 	writel_relaxed(0U, mchp_pwm->base + PWM_EN_HIGH);
 
 	platform_set_drvdata(pdev, mchp_pwm);
-	dev_info(&pdev->dev,
-		 "Successfully registered mpfs pwm with outputs: %x\n",
-		 mchp_pwm->mapped_outputs);
+	dev_info(&pdev->dev, "Successfully registered mchp core pwm\n");
 
 	return ret;
 }
