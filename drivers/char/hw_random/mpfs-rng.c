@@ -82,7 +82,7 @@ static int mpfs_rng_number_probe(struct platform_device *pdev)
 	if (!rng_priv)
 		return -ENOMEM;
 
-	sys_controller_np = of_parse_phandle(pdev->dev.of_node, "syscontroller", 0);
+	sys_controller_np = of_parse_phandle(pdev->dev.of_node, "microchip,syscontroller", 0);
 	if (!sys_controller_np) {
 		dev_err(&pdev->dev,
 			"Failed to find mpfs system controller node\n");
