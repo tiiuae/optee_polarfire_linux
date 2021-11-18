@@ -9,17 +9,16 @@ title: Microchip MPFS I2C Controller Device Tree Bindings
 maintainers:
   - Daire McNamara <daire.mcnamara@microchip.com>
 
-description: |
-  This I2C controller is found on the Microchip PolarFire SoC.
-
 allOf:
   - $ref: /schemas/i2c/i2c-controller.yaml#
 
 properties:
   compatible:
-    enum:
-      - microchip,mpfs-i2c # Microchip PolarFire SoC compatible SoCs
-      - microchip,core-i2c # Microchip Fabric based i2c IP core
+    oneOf:
+      - items:
+        - const: microchip,mpfs-i2c # Microchip PolarFire SoC compatible SoCs
+        - const: microchip,corei2c-rtl-v7 # Microchip Fabric based i2c IP core
+      - const: microchip,corei2c-rtl-v7 # Microchip Fabric based i2c IP core
 
   reg:
     maxItems: 1
@@ -28,8 +27,7 @@ properties:
     maxItems: 1
 
   clocks:
-    description: Phandle of the clock feeding the I2C controller.
-    minItems: 1
+    maxItems: 1
 
   clock-frequency:
     description: |
@@ -48,28 +46,12 @@ unevaluatedProperties: false
 examples:
   - |
     #include <dt-bindings/clock/microchip,mpfs-clock.h>
-    soc {
-        #address-cells = <2>;
-        #size-cells = <2>;
-        i2c@2010a000 {
-            compatible = "microchip,mpfs-i2c";
-            reg = <0 0x2010a000 0 0x1000>;
-            interrupts = <58>;
-            clock-frequency = <100000>;
-            clocks = <&clkcfg CLK_I2C0>;
-        };
-    };
-  - |
-    #include <dt-bindings/clock/microchip,mpfs-clock.h>
-    soc {
-        #address-cells = <2>;
-        #size-cells = <2>;
-        i2c@2010b000 {
-            compatible = "microchip,mpfs-i2c";
-            reg = <0 0x2010b000 0 0x1000>;
-            interrupts = <61>;
-            clock-frequency = <100000>;
-            clocks = <&clkcfg CLK_I2C1>;
-        };
+    i2c@2010a000 {
+      compatible = "microchip,mpfs-i2c", "microchip,corei2c-rtl-v7";
+      reg = <0x2010a000 0x1000>;
+      clocks = <&clkcfg CLK_I2C0>;
+      interrupt-parent = <&plic>;
+      interrupts = <58>;
+      clock-frequency = <100000>;
     };
 ...
