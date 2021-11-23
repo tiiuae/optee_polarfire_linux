@@ -270,7 +270,7 @@ static int mchp_core_pwm_probe(struct platform_device *pdev)
 	if (IS_ERR(mchp_pwm->base))
 		return PTR_ERR(mchp_pwm->base);
 
-	mchp_pwm->clk = devm_clk_get(&pdev->dev, "fic3");
+	mchp_pwm->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(mchp_pwm->clk))
 		return PTR_ERR(mchp_pwm->clk);
 
@@ -286,7 +286,7 @@ static int mchp_core_pwm_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "default to 100kHz\n");
 		mchp_pwm->tmp_clk_rate = 62500000; /* default clock rate */
 	}
-	printk("clk rate %lu\r\n", mchp_pwm->tmp_clk_rate);
+	dev_info(&pdev->dev, "clk rate %lu\r\n", mchp_pwm->tmp_clk_rate);
 	/* temp */
 
 	mchp_pwm->chip.dev = &pdev->dev;
