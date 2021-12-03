@@ -171,9 +171,10 @@ static int ihc_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	ret = of_property_read_u32(np, "miv-ihc,remote-context-id", &ihc->remote_context_id);
+	ret = of_property_read_u32(np, "microchip,miv-ihc-remote-context-id", 
+		&ihc->remote_context_id);
 	if (ret) {
-		dev_err(dev, "missing miv-ihc,remote-context-id property\n");
+		dev_err(dev, "missing microchip,miv-ihc-remote-context-id property\n");
 	}
 
 	ret = ihc_sbi_init(ihc->remote_context_id);
