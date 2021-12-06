@@ -444,7 +444,7 @@ static int microchip_mss_gpio_probe(struct platform_device *pdev)
 	mss_gpio->gc.get_direction = microchip_mss_gpio_get_direction;
 	mss_gpio->gc.get = microchip_mss_gpio_get_value;
 	mss_gpio->gc.set = microchip_mss_gpio_set_value;
-	mss_gpio->gc.base = 0;
+	mss_gpio->gc.base = (pdev->id < 0) ? of_alias_get_id(node, "gpio") * 32 : pdev->id * 32;
 	mss_gpio->gc.ngpio = ngpio;
 	mss_gpio->gc.label = dev_name(dev);
 	mss_gpio->gc.parent = dev;
