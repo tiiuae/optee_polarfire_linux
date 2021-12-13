@@ -512,6 +512,15 @@ static void __init setup_vm_final(void)
 			   __pa_symbol(fixmap_pgd_next),
 			   PGDIR_SIZE, PAGE_TABLE);
 
+	if (!IS_ENABLED(CONFIG_BUILTIN_DTB)) {
+		/* Remap DTB explicitly; make no assumptions about its location */
+		pa = dtb_early_pa & ~(PMD_SIZE - 1);
+		va = (uintptr_t)__va(pa);
+		create_pgd_mapping(swapper_pg_dir, va, pa, PMD_SIZE, PAGE_KERNEL);
+		create_pgd_mapping(swapper_pg_dir, va + PMD_SIZE, pa + PMD_SIZE,
+				   PMD_SIZE, PAGE_KERNEL);
+	}
+
 	/* Map all memory banks */
 	for_each_mem_range(i, &start, &end) {
 		if (start >= end)
