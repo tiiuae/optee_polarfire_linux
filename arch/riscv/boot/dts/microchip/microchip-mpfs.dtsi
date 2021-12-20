@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: (GPL-2.0 OR MIT)
 /* Copyright (c) 2020-2021 Microchip Technology Inc */
 
+/dts-v1/;
 #include "dt-bindings/clock/microchip,mpfs-clock.h"
 #include "dt-bindings/interrupt-controller/microchip,mpfs-plic.h"
 #include "dt-bindings/interrupt-controller/riscv-hart.h"
@@ -12,9 +13,6 @@
 	#size-cells = <2>;
 	model = "Microchip PolarFire SoC";
 	compatible = "microchip,mpfs";
-
-	chosen {
-	};
 
 	cpus {
 		#address-cells = <1>;
@@ -138,7 +136,6 @@
 			clocks = <&clkcfg CLK_CPU>;
 			tlb-split;
 			status = "okay";
-
 			cpu4_intc: interrupt-controller {
 				#interrupt-cells = <1>;
 				compatible = "riscv,cpu-intc";
@@ -147,83 +144,81 @@
 		};
 	};
 
+	refclk: msspllclk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+	};
+
 	soc {
 		#address-cells = <2>;
 		#size-cells = <2>;
-		compatible = "microchip,mpfs-soc", "simple-bus";
+		compatible = "simple-bus";
 		ranges;
 		dma-ranges = <0 0 0 0 0x40 0>;
 
 		cctrllr: cache-controller@2010000 {
 			compatible = "sifive,fu540-c000-ccache", "cache";
 			reg = <0x0 0x2010000 0x0 0x1000>;
-			interrupt-parent = <&plic>;
-			interrupts = <PLIC_INT_L2_METADATA_CORR
-				PLIC_INT_L2_METADAT_UNCORR
-				PLIC_INT_L2_DATA_CORR>;
 			cache-block-size = <64>;
 			cache-level = <2>;
 			cache-sets = <1024>;
 			cache-size = <2097152>;
 			cache-unified;
+			interrupt-parent = <&plic>;
+			interrupts = <PLIC_INT_L2_METADATA_CORR>,
+				     <PLIC_INT_L2_METADAT_UNCORR>,
+				     <PLIC_INT_L2_DATA_CORR>;
 		};
 
 		clint: clint@2000000 {
 			compatible = "sifive,fu540-c000-clint", "sifive,clint0";
 			reg = <0x0 0x2000000 0x0 0xC000>;
-			interrupts-extended =
-					<&cpu0_intc HART_INT_M_SOFT &cpu0_intc HART_INT_M_TIMER
-					 &cpu1_intc HART_INT_M_SOFT &cpu1_intc HART_INT_M_TIMER
-					 &cpu2_intc HART_INT_M_SOFT &cpu2_intc HART_INT_M_TIMER
-					 &cpu3_intc HART_INT_M_SOFT &cpu3_intc HART_INT_M_TIMER
-					 &cpu4_intc HART_INT_M_SOFT &cpu4_intc HART_INT_M_TIMER>;
+			interrupts-extended = <&cpu0_intc HART_INT_M_SOFT>,
+					      <&cpu0_intc HART_INT_M_TIMER>,
+					      <&cpu1_intc HART_INT_M_SOFT>,
+					      <&cpu1_intc HART_INT_M_TIMER>,
+					      <&cpu2_intc HART_INT_M_SOFT>,
+					      <&cpu2_intc HART_INT_M_TIMER>,
+					      <&cpu3_intc HART_INT_M_SOFT>,
+					      <&cpu3_intc HART_INT_M_TIMER>,
+					      <&cpu4_intc HART_INT_M_SOFT>,
+					      <&cpu4_intc HART_INT_M_TIMER>;
 		};
 
 		plic: interrupt-controller@c000000 {
-			compatible = "sifive-fu540-c000-plic", "sifive,plic-1.0.0";
+			compatible = "sifive,fu540-c000-plic", "sifive,plic-1.0.0";
 			reg = <0x0 0xc000000 0x0 0x4000000>;
+			#address-cells = <0>;
 			#interrupt-cells = <1>;
-			riscv,ndev = <186>;
 			interrupt-controller;
-			interrupts-extended = <&cpu0_intc HART_INT_M_EXT
-					&cpu1_intc HART_INT_M_EXT &cpu1_intc HART_INT_S_EXT
-					&cpu2_intc HART_INT_M_EXT &cpu2_intc HART_INT_S_EXT
-					&cpu3_intc HART_INT_M_EXT &cpu3_intc HART_INT_S_EXT
-					&cpu4_intc HART_INT_M_EXT &cpu4_intc HART_INT_S_EXT>;
+			interrupts-extended = <&cpu0_intc HART_INT_M_EXT>,
+					      <&cpu1_intc HART_INT_M_EXT>,
+					      <&cpu1_intc HART_INT_S_EXT>,
+					      <&cpu2_intc HART_INT_M_EXT>,
+					      <&cpu2_intc HART_INT_S_EXT>,
+					      <&cpu3_intc HART_INT_M_EXT>,
+					      <&cpu3_intc HART_INT_S_EXT>,
+					      <&cpu4_intc HART_INT_M_EXT>,
+					      <&cpu4_intc HART_INT_S_EXT>;
+			riscv,ndev = <186>;
 		};
 
 		pdma: pdma@3000000 {
 			compatible = "microchip,mpfs-pdma-uio";
 			reg = <0x0 0x3000000 0x0 0x8000>;
 			interrupt-parent = <&plic>;
-			interrupts = <PLIC_INT_DMA_CH0_DONE PLIC_INT_DMA_CH0_ERR
-				PLIC_INT_DMA_CH1_DONE PLIC_INT_DMA_CH1_ERR
-				PLIC_INT_DMA_CH2_DONE PLIC_INT_DMA_CH2_ERR
-				PLIC_INT_DMA_CH3_DONE PLIC_INT_DMA_CH3_ERR>;
+			interrupts = <PLIC_INT_DMA_CH0_DONE PLIC_INT_DMA_CH0_ERR>,
+				     <PLIC_INT_DMA_CH1_DONE PLIC_INT_DMA_CH1_ERR>,
+				     <PLIC_INT_DMA_CH2_DONE PLIC_INT_DMA_CH2_ERR>,
+				     <PLIC_INT_DMA_CH3_DONE PLIC_INT_DMA_CH3_ERR>;
 			#dma-cells = <1>;
-		};
-
-		refclk: refclk {
-			compatible = "fixed-clock";
-			#clock-cells = <0>;
-			clock-frequency = <600000000>;
-			clock-output-names = "msspllclk";
 		};
 
 		clkcfg: clkcfg@20002000 {
 			compatible = "microchip,mpfs-clkcfg";
 			reg = <0x0 0x20002000 0x0 0x1000>;
-			reg-names = "mss_sysreg";
 			clocks = <&refclk>;
 			#clock-cells = <1>;
-			clock-output-names = "cpu", "axi", "ahb", "envm",	/* 0-3   */
-				"mac0", "mac1", "mmc", "timer",			/* 4-7   */
-				"mmuart0", "mmuart1", "mmuart2", "mmuart3",	/* 8-11  */
-				"mmuart4", "spi0", "spi1", "i2c0",		/* 12-15 */
-				"i2c1", "can0", "can1", "usb",			/* 16-19 */
-				"rsvd", "rtc", "qspi", "gpio0",			/* 20-23 */
-				"gpio1", "gpio2", "ddrc", "fic0",		/* 24-27 */
-				"fic1", "fic2", "fic3", "athena", "cfm";	/* 28-32 */
 		};
 
 		mmuart0: serial@20000000 {
@@ -231,10 +226,10 @@
 			reg = <0x0 0x20000000 0x0 0x400>;
 			reg-io-width = <4>;
 			reg-shift = <2>;
-			clocks = <&clkcfg CLK_MMUART0>;
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_MMUART0>;
 			current-speed = <115200>;
+			clocks = <&clkcfg CLK_MMUART0>;
 			status = "disabled"; /* Reserved for the HSS */
 		};
 
@@ -243,10 +238,10 @@
 			reg = <0x0 0x20100000 0x0 0x400>;
 			reg-io-width = <4>;
 			reg-shift = <2>;
-			clocks = <&clkcfg CLK_MMUART1>;
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_MMUART1>;
 			current-speed = <115200>;
+			clocks = <&clkcfg CLK_MMUART1>;
 			status = "disabled";
 		};
 
@@ -255,10 +250,10 @@
 			reg = <0x0 0x20102000 0x0 0x400>;
 			reg-io-width = <4>;
 			reg-shift = <2>;
-			clocks = <&clkcfg CLK_MMUART2>;
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_MMUART2>;
 			current-speed = <115200>;
+			clocks = <&clkcfg CLK_MMUART2>;
 			status = "disabled";
 		};
 
@@ -267,10 +262,10 @@
 			reg = <0x0 0x20104000 0x0 0x400>;
 			reg-io-width = <4>;
 			reg-shift = <2>;
-			clocks = <&clkcfg CLK_MMUART3>;
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_MMUART3>;
 			current-speed = <115200>;
+			clocks = <&clkcfg CLK_MMUART3>;
 			status = "disabled";
 		};
 
@@ -279,19 +274,20 @@
 			reg = <0x0 0x20106000 0x0 0x400>;
 			reg-io-width = <4>;
 			reg-shift = <2>;
-			clocks = <&clkcfg CLK_MMUART4>;
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_MMUART4>;
+			clocks = <&clkcfg CLK_MMUART4>;
 			current-speed = <115200>;
 			status = "disabled";
 		};
 
-		mmc: mmc@20008000 { /* Common node entry for emmc/sd */
+		/* Common node entry for emmc/sd */
+		mmc: mmc@20008000 {
 			compatible = "microchip,mpfs-sd4hc", "cdns,sd4hc";
 			reg = <0x0 0x20008000 0x0 0x1000>;
-			clocks = <&clkcfg CLK_MMC>;
 			interrupt-parent = <&plic>;
-			interrupts = <PLIC_INT_MMC_MAIN PLIC_INT_MMC_WAKEUP>;
+			interrupts = <PLIC_INT_MMC_MAIN>;
+			clocks = <&clkcfg CLK_MMC>;
 			max-frequency = <200000000>;
 			status = "disabled";
 		};
@@ -301,11 +297,10 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0x0 0x20108000 0x0 0x1000>;
-			clocks = <&clkcfg CLK_SPI0>;
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_SPI0>;
+			clocks = <&clkcfg CLK_SPI0>;
 			spi-max-frequency = <25000000>;
-			num-cs = <8>;
 			status = "disabled";
 		};
 
@@ -314,47 +309,45 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0x0 0x20109000 0x0 0x1000>;
-			clocks = <&clkcfg CLK_SPI1>;
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_SPI1>;
+			clocks = <&clkcfg CLK_SPI1>;
 			spi-max-frequency = <25000000>;
-			num-cs = <8>;
 			status = "disabled";
 		};
 
-		qspi: qspi@21000000 {
+		qspi: spi@21000000 {
 			compatible = "microchip,mpfs-qspi";
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0x0 0x21000000 0x0 0x1000>;
-			clocks = <&clkcfg CLK_QSPI>;
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_QSPI>;
+			clocks = <&clkcfg CLK_QSPI>;
 			spi-max-frequency = <25000000>;
-			num-cs = <8>;
 			status = "disabled";
 		};
 
 		i2c0: i2c@2010a000 {
-			compatible = "microchip,mpfs-i2c";
+			compatible = "microchip,mpfs-i2c", "microchip,corei2c-rtl-v7";
+			reg = <0x0 0x2010a000 0x0 0x1000>;
 			#address-cells = <1>;
 			#size-cells = <0>;
-			reg = <0x0 0x2010a000 0x0 0x1000>;
-			clocks = <&clkcfg CLK_I2C0>;
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_I2C0_MAIN>;
+			clocks = <&clkcfg CLK_I2C0>;
 			clock-frequency = <100000>;
 			status = "disabled";
 		};
 
 		i2c1: i2c@2010b000 {
-			compatible = "microchip,mpfs-i2c";
+			compatible = "microchip,mpfs-i2c", "microchip,corei2c-rtl-v7";
+			reg = <0x0 0x2010b000 0x0 0x1000>;
 			#address-cells = <1>;
 			#size-cells = <0>;
-			reg = <0x0 0x2010b000 0x0 0x1000>;
-			clocks = <&clkcfg CLK_I2C1>;
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_I2C1_MAIN>;
+			clocks = <&clkcfg CLK_I2C1>;
 			clock-frequency = <100000>;
 			status = "disabled";
 		};
@@ -383,46 +376,45 @@
 
 		mac0: ethernet@20110000 {
 			compatible = "cdns,macb";
+			reg = <0x0 0x20110000 0x0 0x2000>;
 			#address-cells = <1>;
 			#size-cells = <0>;
-			reg = <0x0 0x20110000 0x0 0x2000>;
+			interrupt-parent = <&plic>;
+			interrupts = <PLIC_INT_MAC0_INT>,
+				     <PLIC_INT_MAC0_QUEUE1>,
+				     <PLIC_INT_MAC0_QUEUE2>,
+				     <PLIC_INT_MAC0_QUEUE3>,
+				     <PLIC_INT_MAC0_EMAC>,
+				     <PLIC_INT_MAC0_MMSL>;
 			clocks = <&clkcfg CLK_MAC0>, <&clkcfg CLK_AHB>;
 			clock-names = "pclk", "hclk";
-			interrupt-parent = <&plic>;
-			interrupts = <PLIC_INT_MAC0_INT
-				PLIC_INT_MAC0_QUEUE1
-				PLIC_INT_MAC0_QUEUE2
-				PLIC_INT_MAC0_QUEUE3
-				PLIC_INT_MAC0_EMAC
-				PLIC_INT_MAC0_MMSL>;
-			mac-address = [56 34 12 00 FC 01];
 			status = "disabled";
 		};
 
 		mac1: ethernet@20112000 {
 			compatible = "cdns,macb";
+			reg = <0x0 0x20112000 0x0 0x2000>;
 			#address-cells = <1>;
 			#size-cells = <0>;
-			reg = <0x0 0x20112000 0x0 0x2000>;
+			interrupt-parent = <&plic>;
+			interrupts = <PLIC_INT_MAC1_INT>,
+				     <PLIC_INT_MAC1_QUEUE1>,
+				     <PLIC_INT_MAC1_QUEUE2>,
+				     <PLIC_INT_MAC1_QUEUE3>,
+				     <PLIC_INT_MAC1_EMAC>,
+				     <PLIC_INT_MAC1_MMSL>;
 			clocks = <&clkcfg CLK_MAC1>, <&clkcfg CLK_AHB>;
 			clock-names = "pclk", "hclk";
-			interrupt-parent = <&plic>;
-			interrupts = <PLIC_INT_MAC1_INT
-				PLIC_INT_MAC1_QUEUE1
-				PLIC_INT_MAC1_QUEUE2
-				PLIC_INT_MAC1_QUEUE3
-				PLIC_INT_MAC1_EMAC
-				PLIC_INT_MAC1_MMSL>;
-			mac-address = [56 34 12 00 FC 02];
 			status = "disabled";
 		};
 
 		gpio0: gpio@20120000 {
 			compatible = "microchip,mpfs-gpio";
 			reg = <0x0 0x20120000 0x0 0x1000>;
-			reg-names = "control";
-			clocks = <&clkcfg CLK_GPIO0>;
 			interrupt-parent = <&plic>;
+			interrupt-controller;
+			#interrupt-cells = <1>;
+			clocks = <&clkcfg CLK_GPIO0>;
 			gpio-controller;
 			#gpio-cells = <2>;
 			status = "disabled";
@@ -431,9 +423,10 @@
 		gpio1: gpio@20121000 {
 			compatible = "microchip,mpfs-gpio";
 			reg = <000 0x20121000 0x0 0x1000>;
-			reg-names = "control";
-			clocks = <&clkcfg CLK_GPIO1>;
 			interrupt-parent = <&plic>;
+			interrupt-controller;
+			#interrupt-cells = <1>;
+			clocks = <&clkcfg CLK_GPIO1>;
 			gpio-controller;
 			#gpio-cells = <2>;
 			status = "disabled";
@@ -442,9 +435,10 @@
 		gpio2: gpio@20122000 {
 			compatible = "microchip,mpfs-gpio";
 			reg = <0x0 0x20122000 0x0 0x1000>;
-			reg-names = "control";
-			clocks = <&clkcfg CLK_GPIO2>;
 			interrupt-parent = <&plic>;
+			interrupt-controller;
+			#interrupt-cells = <1>;
+			clocks = <&clkcfg CLK_GPIO2>;
 			gpio-controller;
 			#gpio-cells = <2>;
 			status = "disabled";
@@ -452,26 +446,53 @@
 
 		rtc: rtc@20124000 {
 			compatible = "microchip,mpfs-rtc";
-			#address-cells = <1>;
-			#size-cells = <0>;
 			reg = <0x0 0x20124000 0x0 0x1000>;
+			interrupt-parent = <&plic>;
+			interrupts = <PLIC_INT_RTC_WAKEUP>, <PLIC_INT_RTC_MATCH>;
 			clocks = <&clkcfg CLK_RTC>;
 			clock-names = "rtc";
-			interrupt-parent = <&plic>;
-			interrupts = <PLIC_INT_RTC_WAKEUP PLIC_INT_RTC_MATCH>;
+			microchip,prescaler = /bits/ 32 <0xF423F>; // for 1M clock
 			status = "disabled";
 		};
 
 		usb: usb@20201000 {
-			compatible = "microchip,mpfs-usb-host";
+			compatible = "microchip,mpfs-musb";
 			reg = <0x0 0x20201000 0x0 0x1000>;
-			reg-names = "mc","control";
-			clocks = <&clkcfg CLK_USB>;
 			interrupt-parent = <&plic>;
-			interrupts = <PLIC_INT_USB_DMA PLIC_INT_USB_MC>;
-			interrupt-names = "dma","mc";
-			dr_mode = "otg";
+			interrupts = <PLIC_INT_USB_DMA>, <PLIC_INT_USB_MC>;
+			clocks = <&clkcfg CLK_USB>;
+			interrupt-names = "dma", "mc";
 			status = "disabled";
+		};
+
+		pcie: pcie@2000000000 {
+			compatible = "microchip,pcie-host-1.0";
+			#address-cells = <0x3>;
+			#interrupt-cells = <0x1>;
+			#size-cells = <0x2>;
+			device_type = "pci";
+			reg = <0x20 0x0 0x0 0x8000000>, <0x0 0x43000000 0x0 0x10000>;
+			reg-names = "cfg", "apb";
+			bus-range = <0x0 0x7f>;
+			interrupt-parent = <&plic>;
+			interrupts = <PLIC_INT_FABRIC_F2H_1>;
+			interrupt-map = <0 0 0 1 &pcie_intc 0>,
+					<0 0 0 2 &pcie_intc 1>,
+					<0 0 0 3 &pcie_intc 2>,
+					<0 0 0 4 &pcie_intc 3>;
+			interrupt-map-mask = <0 0 0 7>;
+			clocks = <&clkcfg CLK_FIC0>, <&clkcfg CLK_FIC1>, <&clkcfg CLK_FIC3>;
+			clock-names = "fic0", "fic1", "fic3";
+			ranges = <0x3000000 0x0 0x8000000 0x20 0x8000000 0x0 0x80000000>;
+			msi-parent = <&pcie>;
+			msi-controller;
+			microchip,axi-m-atr0 = <0x10 0x0>;
+			status = "disabled";
+			pcie_intc: legacy-interrupt-controller {
+				#address-cells = <0>;
+				#interrupt-cells = <1>;
+				interrupt-controller;
+			};
 		};
 
 		mbox: mailbox@37020000 {
@@ -483,57 +504,17 @@
 			status = "disabled";
 		};
 
-		pcie: pcie@2000000000 {
-			compatible = "microchip,pcie-host-1.0";
-			#address-cells = <0x3>;
-			#interrupt-cells = <0x1>;
-			#size-cells = <0x2>;
-			device_type = "pci";
-			reg = <0x20 0x0 0x0 0x8000000 0x0 0x43000000 0x0 0x10000>;
-			reg-names = "cfg", "apb";
-			clocks = <&clkcfg CLK_FIC0>, <&clkcfg CLK_FIC1>, <&clkcfg CLK_FIC3>;
-			clock-names = "fic0", "fic1", "fic3";
-			bus-range = <0x0 0x7f>;
-			interrupt-parent = <&plic>;
-			interrupts = <PLIC_INT_FABRIC_F2H_1>;
-			interrupt-map = <0 0 0 1 &pcie_intc 0>,
-					<0 0 0 2 &pcie_intc 1>,
-					<0 0 0 3 &pcie_intc 2>,
-					<0 0 0 4 &pcie_intc 3>;
-			interrupt-map-mask = <0 0 0 7>;
-			ranges = <0x3000000 0x0 0x8000000 0x20 0x8000000 0x0 0x80000000>;
-			msi-parent = <&pcie>;
-			msi-controller;
-			mchp,axi-m-atr0 = <0x10 0x0>;
-			status = "disabled";
-			pcie_intc: legacy-interrupt-controller {
-				#address-cells = <0>;
-				#interrupt-cells = <1>;
-				interrupt-controller;
-			};
-		};
-
 		syscontroller: syscontroller {
 			compatible = "microchip,mpfs-sys-controller";
-			#address-cells = <1>;
-			#size-cells = <1>;
 			mboxes = <&mbox 0>;
-		};
 
-		hwrandom: hwrandom {
-			compatible = "microchip,mpfs-rng";
-			#address-cells = <1>;
-			#size-cells = <1>;
-			syscontroller = <&syscontroller>;
-		};
+			rng: rng {
+				compatible = "microchip,mpfs-rng";
+			};
 
-		sysserv: sysserv {
-			compatible = "microchip,mpfs-generic-service";
-			#address-cells = <1>;
-			#size-cells = <1>;
-			syscontroller = <&syscontroller>;
+			sysserv: sysserv {
+				compatible = "microchip,mpfs-generic-service";
+			};
 		};
-
 	};
 };
-

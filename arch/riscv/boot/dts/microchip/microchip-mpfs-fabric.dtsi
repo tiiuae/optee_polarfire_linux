@@ -2,7 +2,7 @@
 /* Copyright (c) 2020-2021 Microchip Technology Inc */
 
 / {
-	fpgadma: fpgadma@60020000 {
+	fpgadma: uio@60020000 {
 		compatible = "microchip,mpfs-fpga-dma-uio";
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -12,18 +12,19 @@
 		status = "okay";
 	};
 
-	fpgalsram: fpga_lsram@61000000 {
+	fpgalsram: uio@61000000 {
 		compatible = "generic-uio";
-		reg = <0x0 0x61000000 0x0 0x0001000
-			0x14 0x00000000 0x0 0x00010000>;
+		linux,uio-name = "fpga_lsram";
+		reg = <0x0 0x61000000 0x0 0x0001000>,
+			<0x14 0x00000000 0x0 0x00010000>;
 		status = "okay";
 	};
 
-	ihc: ihc {
+	ihc: mailbox {
 		compatible = "microchip,miv-ihc";
 		interrupt-parent = <&plic>;
 		interrupts = <IHC_HART1_INT>;
-		miv-ihc,remote-context-id = <IHC_CONTEXT_B>;
+		microchip,miv-ihc-remote-context-id = <IHC_CONTEXT_B>;
 		#mbox-cells = <1>;
 		status = "disabled";
 	};
@@ -35,8 +36,17 @@
 		clock-output-names = "fclk";
 	};
 
+	core_pwm0: pwm@41000000 {
+		compatible = "microchip,corepwm-rtl-v4";
+		reg = <0x0 0x41000000 0x0 0xF0>;
+		microchip,sync-update = /bits/ 16 <0>;
+		clocks = <&clkcfg CLK_FIC3>;
+		#pwm-cells = <2>;
+		status = "disabled";
+	};
+
 	i2c2: i2c@44000000 {
-		compatible = "microchip,core-i2c";
+		compatible = "microchip,corei2c-rtl-v7";
 		reg = <0x0 0x44000000 0x0 0x1000>;
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -47,4 +57,3 @@
 		status = "disabled";
 	};
 };
-
