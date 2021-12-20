@@ -36,7 +36,8 @@ struct mpfs_mss_response {
 
 int mpfs_blocking_transaction(struct mpfs_sys_controller *mpfs_client, void *msg);
 
-struct mpfs_sys_controller *mpfs_sys_controller_get(struct device_node *mailbox_node);
+struct mpfs_sys_controller *mpfs_sys_controller_get(struct device *dev,
+						    struct device_node *sys_ctrl_node);
 
 #else
 
@@ -46,7 +47,8 @@ static int mpfs_blocking_transaction(struct mpfs_sys_controller *mpfs_client, vo
 	return -ENOSYS;
 }
 
-struct mpfs_sys_controller *mpfs_sys_controller_get(struct device_node *mailbox_node)
+struct mpfs_sys_controller *mpfs_sys_controller_get(struct device *dev,
+						    struct device_node *sys_ctrl_node)
 {
 	return NULL;
 }
