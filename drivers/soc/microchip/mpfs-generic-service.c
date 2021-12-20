@@ -64,11 +64,15 @@ static ssize_t mpfs_generic_service_write(struct file *filep, const char __user 
 static ssize_t mpfs_generic_service_read(struct file *filp, char __user *userbuf,
 				     size_t len, loff_t *f_pos)
 {
-	u8 response_msg[generic_service_priv->resp_size_bytes];
+	u8 *response_msg;
 	u8 buffer[2 * generic_service_priv->resp_size_bytes + 3];
 	u8 *cmd_data = generic_service_priv->buffer;
 	u8 *bufferp = buffer;
 	u32 i;
+
+	response_msg = kzalloc(sizeof(*response_msg) * generic_service_priv->resp_size_bytes, GFP_KERNEL);
+	if (!response_msg)
+		return -ENOMEM;
 
 	struct mpfs_mss_response response = {
 		.resp_status = 0U,
@@ -89,13 +93,15 @@ static ssize_t mpfs_generic_service_read(struct file *filp, char __user *userbuf
 		return -EFAULT;
 
 	int ret = mpfs_blocking_transaction(generic_service_priv->sys_controller, &msg);
-	kfree(generic_service_priv->buffer);
 
 	if (ret)
 		return -EIO;
 	bufferp += sprintf(bufferp, "%02x ", response.resp_status);
 	for (i = 0; i < generic_service_priv->resp_size_bytes; i++)
 		bufferp += sprintf(bufferp, "%02x", response_msg[i]);
+
+	kfree(generic_service_priv->buffer);
+	kfree(response_msg);
 
 	return simple_read_from_buffer(
 		userbuf, len, f_pos, buffer,
@@ -133,7 +139,7 @@ static struct miscdevice mpfs_generic_service_dev = {
 
 static int mpfs_generic_service_probe(struct platform_device *pdev)
 {
-	struct device_node *sys_controller_np;
+	struct device_node *node_pointer;
 	struct device *dev = &pdev->dev;
 
 	generic_service_priv =
@@ -141,17 +147,15 @@ static int mpfs_generic_service_probe(struct platform_device *pdev)
 	if (!generic_service_priv)
 		return -ENOMEM;
 	
-	sys_controller_np =
-		of_parse_phandle(pdev->dev.of_node, "microchip,syscontroller", 0);
-	if (!sys_controller_np) {
+	node_pointer = of_get_parent(dev->of_node);
+	if (!node_pointer) {
 		dev_err(&pdev->dev,
 			"Failed to find mpfs system controller node\n");
 		return -ENODEV;
 	}
 
-	generic_service_priv->sys_controller =
-		mpfs_sys_controller_get(sys_controller_np);
-	of_node_put(sys_controller_np);
+	generic_service_priv->sys_controller =  mpfs_sys_controller_get(&pdev->dev, node_pointer);
+	of_node_put(node_pointer);
 	if (!generic_service_priv->sys_controller)
 		return -EPROBE_DEFER;
 
