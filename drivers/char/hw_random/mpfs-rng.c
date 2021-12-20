@@ -71,9 +71,9 @@ static int mpfs_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 	return num_words_rx * sizeof(u32);
 }
 
-static int mpfs_rng_number_probe(struct platform_device *pdev)
+static int mpfs_rng_probe(struct platform_device *pdev)
 {
-	struct device_node *sys_controller_np;
+	struct device_node *node_pointer;
 	struct device *dev = &pdev->dev;
 	struct mpfs_rng_priv *rng_priv;
 	int ret;
@@ -82,19 +82,19 @@ static int mpfs_rng_number_probe(struct platform_device *pdev)
 	if (!rng_priv)
 		return -ENOMEM;
 
-	sys_controller_np = of_parse_phandle(pdev->dev.of_node, "microchip,syscontroller", 0);
-	if (!sys_controller_np) {
+	node_pointer = of_get_parent(dev->of_node);
+	if (!node_pointer) {
 		dev_err(&pdev->dev,
 			"Failed to find mpfs system controller node\n");
 		return -ENODEV;
 	}
 
-	rng_priv->sys_controller = mpfs_sys_controller_get(sys_controller_np);
-	of_node_put(sys_controller_np);
+	rng_priv->sys_controller =  mpfs_sys_controller_get(&pdev->dev, node_pointer);
+	of_node_put(node_pointer);
 	if (!rng_priv->sys_controller)
 		return -EPROBE_DEFER;
 
-	rng_priv->ops.priv = (unsigned long)rng_priv;
+	rng_priv->ops.priv = (unsigned long) rng_priv;
 	rng_priv->ops.read = mpfs_rng_read;
 	rng_priv->ops.name = pdev->name;
 
@@ -111,22 +111,22 @@ static int mpfs_rng_number_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id mpfs_rng_number_of_match[] = {
+static const struct of_device_id mpfs_rng_of_match[] = {
 	{
 		.compatible = "microchip,mpfs-rng",
 	},
 	{},
 };
-MODULE_DEVICE_TABLE(of, mpfs_rng_number_of_match);
+MODULE_DEVICE_TABLE(of, mpfs_rng_of_match);
 
-static struct platform_driver mpfs_rng_number_driver = {
+static struct platform_driver mpfs_rng_driver = {
 	.driver = {
 		.name = "mpfs-rng",
-		.of_match_table = mpfs_rng_number_of_match,
+		.of_match_table = mpfs_rng_of_match,
 	},
-	.probe = mpfs_rng_number_probe,
+	.probe = mpfs_rng_probe,
 };
-module_platform_driver(mpfs_rng_number_driver);
+module_platform_driver(mpfs_rng_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Conor Dooley <conor.dooley@microchip.com>");
