@@ -209,8 +209,8 @@ static int pf_probe(struct platform_device *pdev)
 
 	mode = of_get_property(np, "dr_mode", &strlen);
 	if (!mode) {
-		dev_err(dev, "No 'dr_mode' property found\n");
-		return 0;
+		dev_info(dev, "No 'dr_mode' property found\n");
+		mode = "otg";
 	}
 
 	if (strlen > 0) {
