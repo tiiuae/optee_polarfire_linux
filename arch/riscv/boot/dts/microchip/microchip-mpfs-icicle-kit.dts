@@ -79,7 +79,7 @@
 		sync-mode = <3>;
 	};
 
-	ddrc_cache_hi: memory@1000000000 {
+	ddrc_cache: memory@1000000000 {
 		device_type = "memory";
 		reg = <0x10 0x0 0x0 0x76000000>;
 		clocks = <&clkcfg CLK_DDRC>;
