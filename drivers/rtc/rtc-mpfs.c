@@ -20,23 +20,23 @@
  * Device Specific Peripheral registers structures
  */
 #define CONTROL_REG		0x00
-#define  CONTROL_RUNNING_BIT		BIT(0)
-#define  CONTROL_START_BIT		BIT(0)
-#define  CONTROL_STOP_BIT		BIT(1)
-#define  CONTROL_ALARM_ON_BIT		BIT(2)
-#define  CONTROL_ALARM_OFF_BIT		BIT(3)
-#define  CONTROL_RESET_BIT		BIT(4)
-#define  CONTROL_UPLOAD_BIT		BIT(5)
-#define  CONTROL_WAKEUP_CLR_BIT		BIT(8)
-#define  CONTROL_WAKEUP_SET_BIT		BIT(9)
-#define  CONTROL_UPDATED_BIT		BIT(10)
-#define  MPFS_RTC_NUM_IRQS		2
+#define CONTROL_RUNNING_BIT	BIT(0)
+#define CONTROL_START_BIT	BIT(0)
+#define CONTROL_STOP_BIT	BIT(1)
+#define CONTROL_ALARM_ON_BIT	BIT(2)
+#define CONTROL_ALARM_OFF_BIT	BIT(3)
+#define CONTROL_RESET_BIT	BIT(4)
+#define CONTROL_UPLOAD_BIT	BIT(5)
+#define CONTROL_WAKEUP_CLR_BIT	BIT(8)
+#define CONTROL_WAKEUP_SET_BIT	BIT(9)
+#define CONTROL_UPDATED_BIT	BIT(10)
+#define MPFS_RTC_NUM_IRQS	2
 #define MODE_REG		0x04
-#define  MODE_CLOCK_BIT			BIT(0)
-#define   MODE_CLOCK_CALENDAR		1
-#define  MODE_WAKE_EN_BIT		BIT(1)
-#define  MODE_WAKE_RESET_BIT		BIT(2)
-#define  MODE_WAKE_CONTINUE_BIT		BIT(3)
+#define MODE_CLOCK_BIT		BIT(0)
+#define MODE_CLOCK_CALENDAR	1
+#define MODE_WAKE_EN_BIT	BIT(1)
+#define MODE_WAKE_RESET_BIT	BIT(2)
+#define MODE_WAKE_CONTINUE_BIT	BIT(3)
 #define PRESCALER_REG		0x08
 #define ALARM_LOWER_REG		0x0c
 #define ALARM_UPPER_REG		0x10
@@ -59,7 +59,7 @@
  */
 #define YEAR_OFFSET		(100)
 
-#define MAX_PRESCALER_COUNT	GENMASK(21, 0)
+#define MAX_PRESCALER_COUNT	GENMASK(26, 0)
 #define DEFAULT_PRESCALER	999999  /* (1Mhz / prescaler) -1 = 1Hz */
 
 struct mpfs_rtc_dev {
@@ -370,8 +370,11 @@ static int __init mpfs_rtc_probe(struct platform_device *pdev)
 	}
 
 	ret = of_property_read_u32(pdev->dev.of_node, "microchip,prescaler", &rtcdev->prescaler);
-	if (ret)
-		rtcdev->prescaler = DEFAULT_PRESCALER;
+	if (ret) {
+		rtcdev->prescaler = clk_get_rate(clk) - 1; // prescaler calculation auto adds 1 to the reg
+	}
+
+	dev_info(&pdev->dev, "prescaler set to: %u \r\n", rtcdev->prescaler);
 
 	if (rtcdev->prescaler > MAX_PRESCALER_COUNT) {
 		dev_dbg(&pdev->dev, "invalid prescaler %d\n", rtcdev->prescaler);
