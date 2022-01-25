@@ -54,7 +54,7 @@
 
 struct miv_virdev {
 	struct virtio_device vdev;
-	unsigned int vring[2];
+	u64 vring[2];
 	struct virtqueue *vq[2];
 	int base_vq_id;
 	int num_of_vqs;
@@ -186,7 +186,7 @@ static int set_vring_phy_buf(struct platform_device *pdev,
 {
 	struct resource *res;
 	resource_size_t size;
-	unsigned int start, end;
+	u64 start, end;
 	int i, ret = 0;
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (res) {
@@ -437,7 +437,7 @@ static int miv_rpmsg_probe(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < rpdev->vdev_nums; i++) {
-		dev_info(&pdev->dev, "%s vdev%d: vring0 0x%x, vring1 0x%x\n",
+		dev_info(&pdev->dev, "%s vdev%d: vring0 0x%llx, vring1 0x%llx\n",
 			 __func__, rpdev->vdev_nums,
 			 rpdev->ivdev[i].vring[0],
 			 rpdev->ivdev[i].vring[1]);
