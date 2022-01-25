@@ -148,7 +148,7 @@ static const struct musb_platform_ops pf_ops = {
 	.set_vbus	= pf_musb_set_vbus
 };
 
-static u64 pf_dmamask = DMA_BIT_MASK(32);
+static u64 pf_dmamask = DMA_BIT_MASK(39);
 
 static int pf_probe(struct platform_device *pdev)
 {
