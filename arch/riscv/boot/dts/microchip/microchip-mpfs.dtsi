@@ -470,7 +470,7 @@
 			interrupt-parent = <&plic>;
 			interrupts = <PLIC_INT_USB_DMA PLIC_INT_USB_MC>;
 			interrupt-names = "dma","mc";
-			dr_mode = "host";
+			dr_mode = "otg";
 			status = "disabled";
 		};
 
