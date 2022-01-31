@@ -113,9 +113,6 @@ static int mpfs_rng_number_probe(struct platform_device *pdev)
 
 static const struct of_device_id mpfs_rng_number_of_match[] = {
 	{
-		.compatible = "microchip,polarfire-soc-rng",
-	},
-	{
 		.compatible = "microchip,mpfs-rng",
 	},
 	{},
