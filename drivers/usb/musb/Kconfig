@@ -116,17 +116,17 @@ config USB_MUSB_JZ4740
 	depends on USB=n || USB_OTG_DISABLE_EXTERNAL_HUB
 	select USB_ROLE_SWITCH
 
-config USB_MUSB_MPFS_MICROCHIP
-	tristate "Microchip PolarFire SoC platforms"
-	depends on USB_MUSB_HOST
-	depends on NOP_USB_XCEIV
-
 config USB_MUSB_MEDIATEK
 	tristate "MediaTek platforms"
 	depends on ARCH_MEDIATEK || COMPILE_TEST
 	depends on NOP_USB_XCEIV
 	depends on GENERIC_PHY
 	select USB_ROLE_SWITCH
+
+config USB_MUSB_POLARFIRE_SOC
+	tristate "Microchip PolarFire SoC platforms"
+	depends on USB_MUSB_HOST
+	depends on NOP_USB_XCEIV
 
 comment "MUSB DMA mode"
 
@@ -151,7 +151,7 @@ config USB_UX500_DMA
 
 config USB_INVENTRA_DMA
 	bool 'Inventra'
-	depends on USB_MUSB_OMAP2PLUS || USB_MUSB_MEDIATEK || USB_MUSB_JZ4740 || USB_MUSB_MPFS_MICROCHIP
+	depends on USB_MUSB_OMAP2PLUS || USB_MUSB_MEDIATEK || USB_MUSB_JZ4740 || USB_MUSB_POLARFIRE_SOC
 	help
 	  Enable DMA transfers using Mentor's engine.
 
