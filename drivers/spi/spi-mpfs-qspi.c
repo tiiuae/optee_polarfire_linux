@@ -1,14 +1,12 @@
+// SPDX-License-Identifier: (GPL-2.0)
 /*
- * SPI controller driver for Microsemi PolarFire QSPI
+ * SPI controller driver for Microchip MPFS MSS SPI
  *
- * Copyright (c) 2018 Microsemi Corporation.
+ * Copyright (c) 2018-2021 Microchip Technology Inc
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
+ * Based on spi_mss.c by Emcraft Systems
  */
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -626,7 +624,7 @@ static int mss_spi_probe(struct platform_device *pdev)
 	}
 
 	/* if we are here, we are successful */
-	dev_info(&pdev->dev, "Microsemi QSPI Controller %d up\n",
+	dev_info(&pdev->dev, "Microchip MPFS QSPI Controller %d up\n",
 		master->bus_num);
 
 	goto done;
@@ -670,7 +668,7 @@ static int mss_spi_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#define MICROSEMI_SPI_PM_OPS (NULL)
+#define MICROCHIP_SPI_PM_OPS (NULL)
 
 /*
  * Platform driver data structure
@@ -679,24 +677,23 @@ static int mss_spi_remove(struct platform_device *pdev)
 
 #if defined(CONFIG_OF)
 static const struct of_device_id mss_spi_dt_ids[] = {
-	{ .compatible = "microsemi,ms-pf-mss-qspi" },
 	{ .compatible = "microchip,mpfs-qspi" },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, mss_spi_dt_ids);
 #endif
 
-static struct platform_driver mss_spi_driver = {
+static struct platform_driver mss_qspi_driver = {
 	.probe = mss_spi_probe,
 	.driver = {
-		.name = "microsemi-mss-qspi",
-		.pm = MICROSEMI_SPI_PM_OPS,
+		.name = "microchip,mpfs-qspi",
+		.pm = MICROCHIP_SPI_PM_OPS,
 		.of_match_table = of_match_ptr(mss_spi_dt_ids),
 		.owner = THIS_MODULE,
 	},
 	.remove = mss_spi_remove,
 };
-module_platform_driver(mss_spi_driver);
-MODULE_AUTHOR("Microsemi Corporation");
-MODULE_DESCRIPTION("Microsemi MSS QSPI driver");
-MODULE_LICENSE("GPL");
+module_platform_driver(mss_qspi_driver);
+MODULE_AUTHOR("Microchip Technology");
+MODULE_DESCRIPTION("Microchip MPFS MSS QSPI driver");
+MODULE_LICENSE("GPL v2");

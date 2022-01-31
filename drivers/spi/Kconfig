@@ -602,6 +602,20 @@ config SPI_PL022
 	  controller. If you have an embedded system with an AMBA(R)
 	  bus and a PL022 controller, say Y or M here.
 
+config SPI_POLARFIRE_SOC
+	tristate "Microchip Polarfire SoC SPI controller"
+	depends on SPI_MASTER
+	help
+	  This enables support for the SPI controller on the 
+	  Microchip Polarfire SoC
+
+config SPI_POLARFIRE_SOC_QSPI
+	tristate "Microchip Polarfire SoC QSPI controller"
+	depends on SPI_MASTER
+	help
+	  This enables support for the QSPI controller on the 
+	  Microchip Polarfire SoC
+
 config SPI_PPC4xx
 	tristate "PPC4xx SPI Controller"
 	depends on PPC32 && 4xx
@@ -742,19 +756,6 @@ config SPI_SIFIVE
 	depends on HAS_IOMEM
 	help
 	  This exposes the SPI controller IP from SiFive.
-
-config SPI_MICROSEMI
-	tristate "Microsemi SPI controller"
-	depends on SPI_MASTER
-	help
-	  This selects the Microsemi SPI bus driver
-
-config SPI_MICROSEMI_QSPI
-	tristate "Microsemi/Microchip QSPI controller"
-	depends on SPI_MASTER
-	help
-	  This enables support for the QSPI controller in master
-	  mode.
 
 config SPI_SLAVE_MT27XX
 	tristate "MediaTek SPI slave device"

@@ -1,12 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0)
 /*
- * SPI controller driver for Microsemi MSS SPI
+ * SPI controller driver for Microchip MPFS MSS SPI
  *
- * Copyright (c) 2018 Microsemi Corporation.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright (c) 2018-2021 Microchip Technology Inc
  *
  * Based on spi_mss.c by Emcraft Systems
  */
@@ -757,7 +753,7 @@ static int mss_spi_probe(struct platform_device *pdev)
 	}
 
 	/* if we are here, we are successful */
-	dev_info(&pdev->dev, "Microsemi SPI Controller %d up\n",
+	dev_info(&pdev->dev, "Microchip MPFS SPI Controller %d up\n",
 		master->bus_num);
 
 	goto done;
@@ -802,7 +798,7 @@ static int mss_spi_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#define MICROSEMI_SPI_PM_OPS (NULL)
+#define MICROCHIP_SPI_PM_OPS (NULL)
 
 /*
  * Platform driver data structure
@@ -811,7 +807,6 @@ static int mss_spi_remove(struct platform_device *pdev)
 
 #if defined(CONFIG_OF)
 static const struct of_device_id mss_spi_dt_ids[] = {
-	{ .compatible = "microsemi,ms-pf-mss-spi" },
 	{ .compatible = "microchip,mpfs-spi" },
 	{ /* sentinel */ }
 };
@@ -821,14 +816,14 @@ MODULE_DEVICE_TABLE(of, mss_spi_dt_ids);
 static struct platform_driver mss_spi_driver = {
 	.probe = mss_spi_probe,
 	.driver = {
-		.name = "microsemi-mss-spi",
-		.pm = MICROSEMI_SPI_PM_OPS,
+		.name = "microchip,mpfs-spi",
+		.pm = MICROCHIP_SPI_PM_OPS,
 		.of_match_table = of_match_ptr(mss_spi_dt_ids),
 		.owner = THIS_MODULE,
 	},
 	.remove = mss_spi_remove,
 };
 module_platform_driver(mss_spi_driver);
-MODULE_AUTHOR("Microsemi Corporation");
-MODULE_DESCRIPTION("Microsemi MSS SPI driver");
-MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Microchip Technology");
+MODULE_DESCRIPTION("Microchip MPFS MSS SPI driver");
+MODULE_LICENSE("GPL v2");
