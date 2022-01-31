@@ -165,9 +165,6 @@ static int mpfs_generic_service_probe(struct platform_device *pdev)
 
 static const struct of_device_id mpfs_generic_service_of_match[] = {
 	{
-		.compatible = "microchip,polarfire-soc-generic-service",
-	},
-	{
 		.compatible = "microchip,mpfs-generic-service",
 	},
 	{},
