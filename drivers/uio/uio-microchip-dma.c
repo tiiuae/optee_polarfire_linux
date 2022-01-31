@@ -155,7 +155,7 @@ static int mss_dma_remove(struct platform_device *dev)
 	return 0;
 }
 
-#define MICROSEMI_DMA_PM_OPS (NULL)
+#define MICROCHIP_DMA_PM_OPS (NULL)
 
 #if defined(CONFIG_OF)
 static const struct of_device_id mss_dma_dt_ids[] = {
@@ -169,7 +169,7 @@ static struct platform_driver mss_dma_driver = {
 	.remove = mss_dma_remove,
 	.driver = {
 		.name = DRV_NAME,
-		.pm = MICROSEMI_DMA_PM_OPS,
+		.pm = MICROCHIP_DMA_PM_OPS,
 		.of_match_table = of_match_ptr(mss_dma_dt_ids),
 		.owner = THIS_MODULE,
 		   },

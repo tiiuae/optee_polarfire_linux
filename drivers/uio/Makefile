@@ -13,4 +13,4 @@ obj-$(CONFIG_UIO_FSL_ELBC_GPCM)	+= uio_fsl_elbc_gpcm.o
 obj-$(CONFIG_UIO_HV_GENERIC)	+= uio_hv_generic.o
 obj-$(CONFIG_UIO_MICROCHIP_CAN)	+= uio-microchip-can.o
 obj-$(CONFIG_UIO_MICROCHIP_PDMA) += uio-microchip-pdma.o
-obj-$(CONFIG_UIO_MICROSEMI_DMA)	+= uio-microsemi-dma.o
+obj-$(CONFIG_UIO_MICROCHIP_DMA)	+= uio-microchip-dma.o

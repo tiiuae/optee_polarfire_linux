@@ -178,10 +178,10 @@ config UIO_MICROCHIP_PDMA
 	help
 	  Userspace I/O interface for the PolarFire SoC PDMA.
 
-config UIO_MICROSEMI_DMA
-	tristate "Generic driver for Microsemi Fabric DMA controller"
+config UIO_MICROCHIP_DMA
+	tristate "Generic driver for Microchip Fabric DMA controller"
 	depends on UIO
 	help
-	  Userspace I/O interface for the Microsemi Fabric DMA controller.
+	  Userspace I/O interface for the Microchip Fabric DMA controller.
 
 endif
