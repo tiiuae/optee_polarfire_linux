@@ -246,7 +246,7 @@ static const struct pwm_ops mchp_core_pwm_ops = {
 
 static const struct of_device_id mchp_core_of_match[] = {
 	{
-		.compatible = "microchip,corepwm",
+		.compatible = "microchip,corepwm-rtl-v4",
 	},
 	{ /* sentinel */ },
 };
