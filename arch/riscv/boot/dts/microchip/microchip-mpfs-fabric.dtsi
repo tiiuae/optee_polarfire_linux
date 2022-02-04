@@ -15,8 +15,7 @@
 	fpgalsram: uio@61000000 {
 		compatible = "generic-uio";
 		linux,uio-name = "fpga_lsram";
-		reg = <0x0 0x61000000 0x0 0x0001000>,
-			<0x14 0x00000000 0x0 0x00010000>;
+		reg = <0x0 0x61000000 0x0 0x0001000>;
 		status = "okay";
 	};
 
