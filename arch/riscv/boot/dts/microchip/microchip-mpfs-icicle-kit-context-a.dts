@@ -158,10 +158,6 @@
 	status = "okay";
 };
 
-&qspi {
-	status = "okay";
-};
-
 &i2c0 {
 	status = "okay";
 };
