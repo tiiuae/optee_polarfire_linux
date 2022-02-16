@@ -507,14 +507,6 @@
 		syscontroller: syscontroller {
 			compatible = "microchip,mpfs-sys-controller";
 			mboxes = <&mbox 0>;
-
-			rng: rng {
-				compatible = "microchip,mpfs-rng";
-			};
-
-			sysserv: sysserv {
-				compatible = "microchip,mpfs-generic-service";
-			};
 		};
 	};
 };
