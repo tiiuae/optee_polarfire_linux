@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Microchip MPFS generic_service driver
+ * Microchip PolarFire SoC (MPFS) generic_service driver
  *
  * Copyright (c) 2020-2022 Microchip Corporation. All rights reserved.
  *
- * Author: Conor Dooley
+ * Author: Conor Dooley <conor.dooley@microchip.com>
  *
  */
 
@@ -107,23 +107,19 @@ static ssize_t mpfs_generic_service_read(struct file *filp, char __user *userbuf
 		return -ENOMSG;
 
 	response_msg = (u8 *)generic_service_priv->response->resp_msg;
-	buffer = devm_kmalloc(generic_service_priv->dev, 2 * generic_service_priv->response->resp_size + 3, GFP_KERNEL);
+	buffer = devm_kmalloc(generic_service_priv->dev, generic_service_priv->response->resp_size + 1, GFP_KERNEL);
 
 	if(!buffer) {
 		mpfs_generic_service_free_message_structs();
 		return -ENOMEM;
 	}
 
-	bufferp = buffer;
+	*buffer = generic_service_priv->response->resp_status;
 
-	bufferp += sprintf(bufferp, "%02x ", generic_service_priv->response->resp_status);
-	for (i = 0; i < generic_service_priv->response->resp_size; i++){
-		bufferp += sprintf(bufferp, "%02x", response_msg[i]);
-	}
-	bufferp += sprintf(bufferp, "\0");
+	memcpy(buffer + 1, response_msg, generic_service_priv->response->resp_size);
 
 	ret = simple_read_from_buffer(userbuf, len, f_pos, buffer,
-				      2 * generic_service_priv->response->resp_size + 3);
+				      generic_service_priv->response->resp_size + 1);
 
 	mpfs_generic_service_free_message_structs();
 	devm_kfree(generic_service_priv->dev, buffer);
@@ -162,7 +158,6 @@ static struct miscdevice mpfs_generic_service_dev = {
 
 static int mpfs_generic_service_probe(struct platform_device *pdev)
 {
-	struct device_node *node_pointer;
 	struct device *dev = &pdev->dev;
 
 	generic_service_priv =
@@ -170,23 +165,16 @@ static int mpfs_generic_service_probe(struct platform_device *pdev)
 	if (!generic_service_priv)
 		return -ENOMEM;
 	
-	node_pointer = of_get_parent(dev->of_node);
-	if (!node_pointer) {
-		dev_err(&pdev->dev,
-			"Failed to find mpfs system controller node\n");
-		return -ENODEV;
-	}
-	
-	generic_service_priv->sys_controller =  mpfs_sys_controller_get(&pdev->dev, node_pointer);
-	of_node_put(node_pointer);
-	if (!generic_service_priv->sys_controller)
-		return -EPROBE_DEFER;
+	generic_service_priv->sys_controller =  mpfs_sys_controller_get(&pdev->dev);
+	if (IS_ERR(generic_service_priv->sys_controller))
+		return dev_err_probe(dev, PTR_ERR(generic_service_priv->sys_controller),
+				     "Could not register as a sub device of the system controller\n");
 
 	generic_service_priv->dev = dev;
 
 	platform_set_drvdata(pdev, generic_service_priv);
 	misc_register(&mpfs_generic_service_dev);
-	dev_info(dev, "Successfully registered mpfs generic_service driver\n");
+	dev_info(&pdev->dev, "Registered MPFS generic_service\n");
 
 	return 0;
 }
@@ -210,4 +198,4 @@ module_platform_driver(mpfs_generic_service_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Conor Dooley <conor.dooley@microchip.com>");
-MODULE_DESCRIPTION("PFSoC generic_service driver");
+MODULE_DESCRIPTION("MPFS generic_service driver");
