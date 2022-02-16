@@ -26,11 +26,9 @@ struct mpfs_sys_controller {
 	struct kref consumers;
 };
 
-int mpfs_blocking_transaction(struct mpfs_sys_controller *sys_controller, void *msg)
+int mpfs_blocking_transaction(struct mpfs_sys_controller *sys_controller, struct mpfs_mss_msg *msg)
 {
-	int ret, err, i;
-	struct mpfs_mss_msg *message = msg;
-	struct mpfs_mss_response *response = message->response;
+	int ret, err;
 
 	err = mutex_lock_interruptible(&transaction_lock);
 	if (err)
@@ -83,10 +81,22 @@ void mpfs_sys_controller_put(void *data)
 }
 EXPORT_SYMBOL_GPL(mpfs_sys_controller_put);
 
+static struct platform_device subdevs[] = {
+	{
+		.name		= "mpfs-rng",
+		.id		= -1,
+	},
+	{
+		.name		= "mpfs-generic-service",
+		.id		= -1,
+	}
+};
+
 static int mpfs_sys_controller_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct mpfs_sys_controller *sys_controller;
+	int i;
 
 	sys_controller = kzalloc(sizeof(*sys_controller), GFP_KERNEL);
 	if (!sys_controller)
@@ -106,9 +116,15 @@ static int mpfs_sys_controller_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, sys_controller);
 
-	dev_info(&pdev->dev, "Registered MPFS system controller driver\n");
+	dev_info(&pdev->dev, "Registered MPFS system controller\n");
 
-	return devm_of_platform_populate(&pdev->dev);
+	for (i = 0; i < ARRAY_SIZE(subdevs); i++) {
+		subdevs[i].dev.parent = dev;
+		if (platform_device_register(&subdevs[i]))
+			dev_warn(dev, "Error registering sub device %s\n", subdevs[i].name);
+	}
+
+	return 0;
 }
 
 static int mpfs_sys_controller_remove(struct platform_device *pdev)
@@ -120,41 +136,48 @@ static int mpfs_sys_controller_remove(struct platform_device *pdev)
 	return 0;
 }
 
-struct mpfs_sys_controller *mpfs_sys_controller_get(struct device *dev,
-						    struct device_node *sys_ctrl_node)
-{
-	struct mpfs_sys_controller *sys_controller;
-	struct platform_device *pdev;
-
-	pdev = of_find_device_by_node(sys_ctrl_node);
-	if (!pdev)
-		return NULL;
-
-	sys_controller = platform_get_drvdata(pdev);
-	if (!sys_controller)
-		goto err_put_device;
-
-	if (!kref_get_unless_zero(&sys_controller->consumers))
-		goto err_put_device;
-
-	put_device(&pdev->dev);
-
-	if (devm_add_action_or_reset(dev, mpfs_sys_controller_put, sys_controller))
-		return NULL;
-
-	return sys_controller;
-
-err_put_device:
-	put_device(&pdev->dev);
-	return NULL;
-}
-EXPORT_SYMBOL_GPL(mpfs_sys_controller_get);
-
 static const struct of_device_id mpfs_sys_controller_of_match[] = {
 	{.compatible = "microchip,mpfs-sys-controller", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, mpfs_sys_controller_of_match);
+
+struct mpfs_sys_controller *mpfs_sys_controller_get(struct device *dev)
+{
+	const struct of_device_id *match;
+	struct mpfs_sys_controller *sys_controller;
+	int ret;
+
+	if (!dev->parent)
+		goto err_no_device;
+
+	match = of_match_node(mpfs_sys_controller_of_match,  dev->parent->of_node);
+	of_node_put(dev->parent->of_node);
+	if (!match)
+		goto err_no_device;
+
+	sys_controller = dev_get_drvdata(dev->parent);
+	if (!sys_controller)
+		goto err_bad_device;
+
+	if (!kref_get_unless_zero(&sys_controller->consumers))
+		goto err_bad_device;
+
+	ret = devm_add_action_or_reset(dev, mpfs_sys_controller_put, sys_controller);
+	if (ret)
+		return ERR_PTR(ret);
+
+	return sys_controller;
+
+err_no_device:
+	dev_dbg(dev, "Parent device was not an MPFS system controller\n");
+	return ERR_PTR(-ENODEV);
+
+err_bad_device:
+	dev_dbg(dev, "MPFS system controller found but could not register as a sub device\n");
+	return ERR_PTR(-EPROBE_DEFER);
+}
+EXPORT_SYMBOL_GPL(mpfs_sys_controller_get);
 
 static struct platform_driver mpfs_sys_controller_driver = {
 	.driver = {
