@@ -44,7 +44,7 @@
 	core_pwm0: pwm@41000000 {
 		compatible = "microchip,corepwm-rtl-v4";
 		reg = <0x0 0x41000000 0x0 0xF0>;
-		microchip,sync-update = /bits/ 16 <0>;
+		microchip,sync-update-mask = /bits/ 32 <0>;
 		clocks = <&fabric_clk3>;
 		#pwm-cells = <2>;
 		status = "disabled";
