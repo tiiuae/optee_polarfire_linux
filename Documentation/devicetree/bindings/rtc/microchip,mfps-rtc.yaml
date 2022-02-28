@@ -23,11 +23,12 @@ properties:
     maxItems: 1
 
   interrupts:
-    description: |
-      The RTC on the PolarFire SoC has a pair of interrupts. The first is the
-      RTC_WAKEUP interrupt. The second, RTC_MATCH, is asserted when the
-      content of the Alarm register is equal to that of the RTC's count.
-    maxItems: 2
+    items:
+      - description: |
+          RTC_WAKEUP interrupt
+      - description: |
+          RTC_MATCH, asserted when the content of the Alarm register is equal
+          to that of the RTC's count register.
 
   microchip,prescaler:
     description: |
