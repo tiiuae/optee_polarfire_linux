@@ -23,27 +23,26 @@ properties:
     maxItems: 1
 
   interrupts:
-    description: |
-      The RTC on the PolarFire SoC has a pair of interrupts. The first is the
-      RTC_WAKEUP interrupt. The second, RTC_MATCH, is asserted when the
-      content of the Alarm register is equal to that of the RTC's count.
-    maxItems: 2
-
-  microchip,prescaler:
-    description: |
-      The prescaler divides the input frequency to create a time-based strobe (typically 1 Hz) for
-      the calendar counter. The Alarm and Compare Registers, in conjunction with the calendar
-      counter, facilitate time-matched events. To properly operate in Calendar or Binary mode,
-      the 26-bit prescaler must be programmed to generate a strobe to the RTC.
-    maxItems: 1
-    $ref: /schemas/types.yaml#/definitions/uint32
+    items:
+      - description: |
+          RTC_WAKEUP interrupt
+      - description: |
+          RTC_MATCH, asserted when the content of the Alarm register is equal
+          to that of the RTC's count register.
 
   clocks:
-    maxItems: 1
+     items:
+      - description: |
+          AHB clock
+      - description: |
+          Reference clock: divided by the prescaler to create a time-based strobe (typically 1 Hz)
+          for the calendar counter. By default, the rtc on the PolarFire SoC shares it's reference
+          with MTIMER so this will be a 1 MHz clock.
 
   clock-names:
     items:
       - const: rtc
+      - const: rtcref
 
 required:
   - compatible
@@ -56,12 +55,11 @@ additionalProperties: false
 
 examples:
   - |
-    #include <dt-bindings/clock/microchip,mpfs-clock.h>
     rtc@20124000 {
         compatible = "microchip,mpfs-rtc";
         reg = <0x20124000 0x1000>;
-        clocks = <&clkcfg CLK_RTC>;
-        clock-names = "rtc";
+        clocks = <&clkcfg 22>, <&clkcfg 3>;;
+        clock-names = "rtc", "rtcref";
         interrupts = <80>, <81>;
     };
 ...
