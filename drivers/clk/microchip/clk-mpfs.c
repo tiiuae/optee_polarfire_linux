@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Daire McNamara,<daire.mcnamara@microchip.com>
- * Copyright (C) 2020 Microchip Technology Inc.  All rights reserved.
+ * Copyright (C) 2020-2022 Microchip Technology Inc. All rights reserved.
  */
 #include <linux/clk-provider.h>
-#include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -22,10 +21,7 @@ struct mpfs_clock_data {
 };
 
 struct mpfs_cfg_clock {
-	const char *name;
 	const struct clk_div_table *table;
-	struct clk_hw *parent;
-	unsigned long flags;
 	unsigned int id;
 	u8 shift;
 	u8 width;
@@ -34,8 +30,6 @@ struct mpfs_cfg_clock {
 struct mpfs_cfg_hw_clock {
 	struct mpfs_cfg_clock cfg;
 	void __iomem *sys_base;
-	/* lock is used to prevent multiple writes */
-	spinlock_t *lock;
 	struct clk_hw hw;
 	struct clk_init_data init;
 };
@@ -43,9 +37,6 @@ struct mpfs_cfg_hw_clock {
 #define to_mpfs_cfg_clk(_hw) container_of(_hw, struct mpfs_cfg_hw_clock, hw)
 
 struct mpfs_periph_clock {
-	const char *name;
-	struct clk_hw *parent;
-	unsigned long flags;
 	unsigned int id;
 	u8 shift;
 };
@@ -53,8 +44,6 @@ struct mpfs_periph_clock {
 struct mpfs_periph_hw_clock {
 	struct mpfs_periph_clock periph;
 	void __iomem *sys_base;
-	/* lock is used to prevent multiple writes */
-	spinlock_t *lock;
 	struct clk_hw hw;
 };
 
@@ -65,6 +54,10 @@ struct mpfs_periph_hw_clock {
  * mpfs clk block while a software locked register is being written.
  */
 static DEFINE_SPINLOCK(mpfs_clk_lock);
+
+static const struct clk_parent_data mpfs_cfg_parent[] = {
+	{ .index = 0 },
+};
 
 static const struct clk_div_table mpfs_div_cpu_axi_table[] = {
 	{ 0, 1 }, { 1, 2 }, { 2, 4 }, { 3, 8 },
@@ -94,7 +87,7 @@ static long mpfs_cfg_clk_round_rate(struct clk_hw *hw, unsigned long rate, unsig
 	struct mpfs_cfg_hw_clock *cfg_hw = to_mpfs_cfg_clk(hw);
 	struct mpfs_cfg_clock *cfg = &cfg_hw->cfg;
 
-	return divider_round_rate(hw, rate, prate, cfg->table, cfg->width, cfg->flags);
+	return divider_round_rate(hw, rate, prate, cfg->table, cfg->width, 0);
 }
 
 static int mpfs_cfg_clk_set_rate(struct clk_hw *hw, unsigned long rate, unsigned long prate)
@@ -102,23 +95,23 @@ static int mpfs_cfg_clk_set_rate(struct clk_hw *hw, unsigned long rate, unsigned
 	struct mpfs_cfg_hw_clock *cfg_hw = to_mpfs_cfg_clk(hw);
 	struct mpfs_cfg_clock *cfg = &cfg_hw->cfg;
 	void __iomem *base_addr = cfg_hw->sys_base;
-	unsigned long flags = 0;
+	unsigned long flags;
 	u32 val;
 	int divider_setting;
 
-	divider_setting = divider_get_val(rate, prate, cfg->table, cfg->width, cfg_hw->cfg.flags);
+	divider_setting = divider_get_val(rate, prate, cfg->table, cfg->width, 0);
 
 	if (divider_setting < 0)
 		return divider_setting;
 
-	spin_lock_irqsave(cfg_hw->lock, flags);
+	spin_lock_irqsave(&mpfs_clk_lock, flags);
 
 	val = readl_relaxed(base_addr + REG_CLOCK_CONFIG_CR);
 	val &= ~(clk_div_mask(cfg->width) << cfg_hw->cfg.shift);
 	val |= divider_setting << cfg->shift;
 	writel_relaxed(val, base_addr + REG_CLOCK_CONFIG_CR);
 
-	spin_unlock_irqrestore(cfg_hw->lock, flags);
+	spin_unlock_irqrestore(&mpfs_clk_lock, flags);
 
 	return 0;
 }
@@ -129,69 +122,49 @@ static const struct clk_ops mpfs_clk_cfg_ops = {
 	.set_rate = mpfs_cfg_clk_set_rate,
 };
 
-#define CLK_CFG(_id, _name, _shift, _width, _table, _flags) {				\
-		.cfg.id = _id,								\
-		.cfg.name = _name,							\
-		.cfg.shift = _shift,							\
-		.cfg.width = _width,							\
-		.cfg.table = _table,							\
-	}
+#define CLK_CFG(_id, _name, _parent, _shift, _width, _table, _flags) {		\
+	.cfg.id = _id,								\
+	.cfg.shift = _shift,							\
+	.cfg.width = _width,							\
+	.cfg.table = _table,							\
+	.hw.init = CLK_HW_INIT_PARENTS_DATA(_name, _parent, &mpfs_clk_cfg_ops,	\
+					    _flags),				\
+}
 
 static struct mpfs_cfg_hw_clock mpfs_cfg_clks[] = {
-	CLK_CFG(CLK_CPU, "clk_cpu", 0, 2, mpfs_div_cpu_axi_table, 0),
-	CLK_CFG(CLK_AXI, "clk_axi", 2, 2, mpfs_div_cpu_axi_table, 0),
-	CLK_CFG(CLK_AHB, "clk_ahb", 4, 2, mpfs_div_ahb_table, 0),
+	CLK_CFG(CLK_CPU, "clk_cpu", mpfs_cfg_parent, 0, 2, mpfs_div_cpu_axi_table, 0),
+	CLK_CFG(CLK_AXI, "clk_axi", mpfs_cfg_parent, 2, 2, mpfs_div_cpu_axi_table, 0),
+	CLK_CFG(CLK_AHB, "clk_ahb", mpfs_cfg_parent, 4, 2, mpfs_div_ahb_table, 0),
 };
 
-static struct clk_hw *mpfs_clk_register_cfg(struct device *dev,
-					    struct mpfs_cfg_hw_clock *cfg_hw,
-					    void __iomem *sys_base)
+static int mpfs_clk_register_cfg(struct device *dev, struct mpfs_cfg_hw_clock *cfg_hw,
+				 void __iomem *sys_base)
 {
-	struct clk_hw *hw;
-	int err;
-
 	cfg_hw->sys_base = sys_base;
-	cfg_hw->lock = &mpfs_clk_lock;
 
-	hw = &cfg_hw->hw;
-	err = devm_clk_hw_register(dev, hw);
-	if (err)
-		return ERR_PTR(err);
-
-	return hw;
+	return devm_clk_hw_register(dev, &cfg_hw->hw);
 }
 
 static int mpfs_clk_register_cfgs(struct device *dev, struct mpfs_cfg_hw_clock *cfg_hws,
-				  unsigned int num_clks, struct mpfs_clock_data *data,
-				  struct clk *clk_parent)
+				  unsigned int num_clks, struct mpfs_clock_data *data)
 {
-	struct clk_hw *hw;
 	void __iomem *sys_base = data->base;
 	unsigned int i, id;
+	int ret;
 
 	for (i = 0; i < num_clks; i++) {
 		struct mpfs_cfg_hw_clock *cfg_hw = &cfg_hws[i];
 
-		cfg_hw->cfg.parent = __clk_get_hw(clk_parent);
-		cfg_hw->hw.init = CLK_HW_INIT_HW(cfg_hw->cfg.name, cfg_hw->cfg.parent,
-						 &mpfs_clk_cfg_ops, cfg_hw->cfg.flags);
-		hw = mpfs_clk_register_cfg(dev, cfg_hw, sys_base);
-		if (IS_ERR(hw)) {
-			dev_err(dev, "failed to register clock %s\n", cfg_hw->cfg.name);
-			goto err_clk;
-		}
+		ret = mpfs_clk_register_cfg(dev, cfg_hw, sys_base);
+		if (ret)
+			return dev_err_probe(dev, ret, "failed to register clock id: %d\n",
+					     cfg_hw->cfg.id);
 
 		id = cfg_hws[i].cfg.id;
-		data->hw_data.hws[id] = hw;
+		data->hw_data.hws[id] = &cfg_hw->hw;
 	}
 
 	return 0;
-
-err_clk:
-	while (i--)
-		devm_clk_hw_unregister(dev, data->hw_data.hws[cfg_hws[i].cfg.id]);
-
-	return PTR_ERR(hw);
 }
 
 static int mpfs_periph_clk_enable(struct clk_hw *hw)
@@ -200,9 +173,9 @@ static int mpfs_periph_clk_enable(struct clk_hw *hw)
 	struct mpfs_periph_clock *periph = &periph_hw->periph;
 	void __iomem *base_addr = periph_hw->sys_base;
 	u32 reg, val;
-	unsigned long flags = 0;
+	unsigned long flags;
 
-	spin_lock_irqsave(periph_hw->lock, flags);
+	spin_lock_irqsave(&mpfs_clk_lock, flags);
 
 	reg = readl_relaxed(base_addr + REG_SUBBLK_RESET_CR);
 	val = reg & ~(1u << periph->shift);
@@ -212,7 +185,7 @@ static int mpfs_periph_clk_enable(struct clk_hw *hw)
 	val = reg | (1u << periph->shift);
 	writel_relaxed(val, base_addr + REG_SUBBLK_CLOCK_CR);
 
-	spin_unlock_irqrestore(periph_hw->lock, flags);
+	spin_unlock_irqrestore(&mpfs_clk_lock, flags);
 
 	return 0;
 }
@@ -223,9 +196,9 @@ static void mpfs_periph_clk_disable(struct clk_hw *hw)
 	struct mpfs_periph_clock *periph = &periph_hw->periph;
 	void __iomem *base_addr = periph_hw->sys_base;
 	u32 reg, val;
-	unsigned long flags = 0;
+	unsigned long flags;
 
-	spin_lock_irqsave(periph_hw->lock, flags);
+	spin_lock_irqsave(&mpfs_clk_lock, flags);
 
 	reg = readl_relaxed(base_addr + REG_SUBBLK_RESET_CR);
 	val = reg | (1u << periph->shift);
@@ -235,7 +208,7 @@ static void mpfs_periph_clk_disable(struct clk_hw *hw)
 	val = reg & ~(1u << periph->shift);
 	writel_relaxed(val, base_addr + REG_SUBBLK_CLOCK_CR);
 
-	spin_unlock_irqrestore(periph_hw->lock, flags);
+	spin_unlock_irqrestore(&mpfs_clk_lock, flags);
 }
 
 static int mpfs_periph_clk_is_enabled(struct clk_hw *hw)
@@ -255,27 +228,30 @@ static int mpfs_periph_clk_is_enabled(struct clk_hw *hw)
 	return 0;
 }
 
-static unsigned long mpfs_periph_clk_recalc_rate(struct clk_hw *hw, unsigned long prate)
-{
-	return prate;
-}
-
 static const struct clk_ops mpfs_periph_clk_ops = {
 	.enable = mpfs_periph_clk_enable,
 	.disable = mpfs_periph_clk_disable,
 	.is_enabled = mpfs_periph_clk_is_enabled,
-	.recalc_rate = mpfs_periph_clk_recalc_rate,
 };
 
-#define CLK_PERIPH(_id, _name, _parent, _shift, _flags) {				\
-		.periph.id = _id,							\
-		.periph.name = _name,							\
-		.periph.shift = _shift,							\
-		.periph.flags = _flags,							\
-		.periph.parent = _parent,						\
+#define CLK_PERIPH(_id, _name, _parent, _shift, _flags) {			\
+	.periph.id = _id,							\
+	.periph.shift = _shift,							\
+	.hw.init = CLK_HW_INIT_HW(_name, _parent, &mpfs_periph_clk_ops,		\
+				  _flags),					\
 }
 
 #define PARENT_CLK(PARENT) (&mpfs_cfg_clks[CLK_##PARENT].hw)
+
+/*
+ * Critical clocks:
+ * - CLK_ENVM: reserved by hart software services (hss) superloop monitor/m mode interrupt
+ *   trap handler
+ * - CLK_MMUART0: reserved by the hss
+ * - CLK_DDRC: provides clock to the ddr subsystem
+ * - CLK_FICx: these provide clocks for sections of the fpga fabric, disabling them would
+ *   cause the fabric to go into reset
+ */
 
 static struct mpfs_periph_hw_clock mpfs_periph_clks[] = {
 	CLK_PERIPH(CLK_ENVM, "clk_periph_envm", PARENT_CLK(AHB), 0, CLK_IS_CRITICAL),
@@ -309,102 +285,69 @@ static struct mpfs_periph_hw_clock mpfs_periph_clks[] = {
 	CLK_PERIPH(CLK_CFM, "clk_periph_cfm", PARENT_CLK(AHB), 29, 0),
 };
 
-static struct clk_hw *mpfs_clk_register_periph(struct device *dev,
-					       struct mpfs_periph_hw_clock *periph_hw,
-					       void __iomem *sys_base)
+static int mpfs_clk_register_periph(struct device *dev, struct mpfs_periph_hw_clock *periph_hw,
+				    void __iomem *sys_base)
 {
-	struct clk_hw *hw;
-	int err;
-
 	periph_hw->sys_base = sys_base;
-	periph_hw->lock = &mpfs_clk_lock;
-	hw = &periph_hw->hw;
-	err = devm_clk_hw_register(dev, hw);
-	if (err)
-		return ERR_PTR(err);
 
-	return hw;
+	return devm_clk_hw_register(dev, &periph_hw->hw);
 }
 
 static int mpfs_clk_register_periphs(struct device *dev, struct mpfs_periph_hw_clock *periph_hws,
 				     int num_clks, struct mpfs_clock_data *data)
 {
-	struct clk_hw *hw;
 	void __iomem *sys_base = data->base;
 	unsigned int i, id;
+	int ret;
 
 	for (i = 0; i < num_clks; i++) {
 		struct mpfs_periph_hw_clock *periph_hw = &periph_hws[i];
 
-		periph_hw->hw.init = CLK_HW_INIT_HW(periph_hw->periph.name,
-						    periph_hw->periph.parent,
-						    &mpfs_periph_clk_ops,
-						    periph_hw->periph.flags);
-		hw = mpfs_clk_register_periph(dev, periph_hw, sys_base);
-		if (IS_ERR(hw)) {
-			dev_err(dev, "failed to register clock %s\n", periph_hw->periph.name);
-			goto err_clk;
-		}
+		ret = mpfs_clk_register_periph(dev, periph_hw, sys_base);
+		if (ret)
+			return dev_err_probe(dev, ret, "failed to register clock id: %d\n",
+					     periph_hw->periph.id);
 
 		id = periph_hws[i].periph.id;
-		data->hw_data.hws[id] = hw;
+		data->hw_data.hws[id] = &periph_hw->hw;
 	}
 
 	return 0;
-
-err_clk:
-	while (i--)
-		devm_clk_hw_unregister(dev, data->hw_data.hws[periph_hws[i].periph.id]);
-
-	return PTR_ERR(hw);
 }
 
 static int mpfs_clk_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct mpfs_clock_data *clk_data;
-	struct clk *clk_parent;
-	struct resource *res;
 	unsigned int num_clks;
 	int ret;
 
-	//CLK_RESERVED is not part of cfg_clks nor periph_clks, so add 1
+	/* CLK_RESERVED is not part of cfg_clks nor periph_clks, so add 1 */
 	num_clks = ARRAY_SIZE(mpfs_cfg_clks) + ARRAY_SIZE(mpfs_periph_clks) + 1;
 
 	clk_data = devm_kzalloc(dev, struct_size(clk_data, hw_data.hws, num_clks), GFP_KERNEL);
 	if (!clk_data)
 		return -ENOMEM;
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	clk_data->base = devm_ioremap_resource(dev, res);
+	clk_data->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(clk_data->base))
 		return PTR_ERR(clk_data->base);
 
 	clk_data->hw_data.num = num_clks;
 
-	clk_parent = devm_clk_get(dev, NULL);
-	if (IS_ERR(clk_parent))
-		return PTR_ERR(clk_parent);
-
-	ret = mpfs_clk_register_cfgs(dev, mpfs_cfg_clks, ARRAY_SIZE(mpfs_cfg_clks), clk_data,
-				     clk_parent);
+	ret = mpfs_clk_register_cfgs(dev, mpfs_cfg_clks, ARRAY_SIZE(mpfs_cfg_clks), clk_data);
 	if (ret)
-		goto err_clk;
+		return ret;
 
 	ret = mpfs_clk_register_periphs(dev, mpfs_periph_clks, ARRAY_SIZE(mpfs_periph_clks),
 					clk_data);
 	if (ret)
-		goto err_clk;
+		return ret;
 
 	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get, &clk_data->hw_data);
 	if (ret)
-		goto err_clk;
+		return ret;
 
-	dev_info(dev, "registered MPFS core clocks\n");
-	return ret;
-
-err_clk:
-	dev_err(dev, "failed to register MPFS core clocks\n");
 	return ret;
 }
 
@@ -436,4 +379,3 @@ module_exit(clk_mpfs_exit);
 
 MODULE_DESCRIPTION("Microchip PolarFire SoC Clock Driver");
 MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("platform:clk-mpfs");
