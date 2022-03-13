@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Microchip corei2c I2C controller driver
+ * Microchip CoreI2C I2C controller driver
  *
- * Copyright (c) 2018 - 2021 Microchip Corporation. All rights reserved.
+ * Copyright (c) 2018 - 2022 Microchip Corporation. All rights reserved.
  *
  * Author: Daire McNamara <daire.mcnamara@microchip.com>
+ * Author: Conor Dooley <conor.dooley@microchip.com>
  */
 #include <linux/clk.h>
 #include <linux/clkdev.h>
@@ -52,36 +53,36 @@
 #define   STATUS_S_RX_STOP			(0xA0)
 #define   STATUS_S_SLAR_ACKED			(0xA8)
 #define   STATUS_S_ARB_LOST_SLAR_ACKED		(0xB0)
-#define   STATUS_S_TX_DATA_ACK			(0xb8)
+#define   STATUS_S_TX_DATA_ACK			(0xB8)
 #define   STATUS_S_TX_DATA_NACK			(0xC0)
 #define   STATUS_LAST_DATA_ACK			(0xC8)
 #define   STATUS_M_SMB_MASTER_RESET		(0xD0)
 #define   STATUS_S_SCL_LOW_TIMEOUT		(0xD8) /* 25 ms */
 #define   STATUS_NO_STATE_INFO			(0xF8)
 #define MPFS_I2C_DATA				(0x08)
-#define   WRITE_BIT				(0)
-#define   READ_BIT				BIT(0)
+#define   WRITE_BIT				(0x0)
+#define   READ_BIT				(0x1)
 #define   SLAVE_ADDR_SHIFT			(1)
 #define MPFS_I2C_SLAVE0_ADDR			(0x0c)
-#define   GENERAL_CALL_BIT			BIT(0)
+#define   GENERAL_CALL_BIT			(0x0)
 #define MPFS_I2C_SMBUS				(0x10)
-#define   SMBALERT_INT_ENB			(0)
-#define   SMBSUS_INT_ENB			(1)
-#define   SMBUS_ENB				(2)
-#define   SMBALERT_NI_STATUS			(3)
-#define   SMBALERT_NO_CTRL			(4)
-#define   SMBSUS_NI_STATUS			(5)
-#define   SMBSUS_NO_CTRL			(6)
-#define   SMBUS_RESET				(7)
+#define   SMBALERT_INT_ENB			(0x0)
+#define   SMBSUS_INT_ENB			(0x1)
+#define   SMBUS_ENB				(0x2)
+#define   SMBALERT_NI_STATUS			(0x3)
+#define   SMBALERT_NO_CTRL			(0x4)
+#define   SMBSUS_NI_STATUS			(0x5)
+#define   SMBSUS_NO_CTRL			(0x6)
+#define   SMBUS_RESET				(0x7)
 #define MPFS_I2C_FREQ				(0x14)
 #define MPFS_I2C_GLITCHREG			(0x18)
 #define MPFS_I2C_SLAVE1_ADDR			(0x1c)
 
+#define PCLK_DIV_960  ((0 << CTRL_CR0) | (0 << CTRL_CR1) | (1 << CTRL_CR2))
 #define PCLK_DIV_256  ((0 << CTRL_CR0) | (0 << CTRL_CR1) | (0 << CTRL_CR2))
 #define PCLK_DIV_224  ((1 << CTRL_CR0) | (0 << CTRL_CR1) | (0 << CTRL_CR2))
 #define PCLK_DIV_192  ((0 << CTRL_CR0) | (1 << CTRL_CR1) | (0 << CTRL_CR2))
 #define PCLK_DIV_160  ((1 << CTRL_CR0) | (1 << CTRL_CR1) | (0 << CTRL_CR2))
-#define PCLK_DIV_960  ((0 << CTRL_CR0) | (0 << CTRL_CR1) | (1 << CTRL_CR2))
 #define PCLK_DIV_120  ((1 << CTRL_CR0) | (0 << CTRL_CR1) | (1 << CTRL_CR2))
 #define PCLK_DIV_60   ((0 << CTRL_CR0) | (1 << CTRL_CR1) | (1 << CTRL_CR2))
 #define BCLK_DIV_8    ((1 << CTRL_CR0) | (1 << CTRL_CR1) | (1 << CTRL_CR2))
@@ -110,21 +111,13 @@ struct mpfs_i2c_dev {
 	struct device *dev;
 	struct i2c_adapter adapter;
 	struct clk *i2c_clk;
+	spinlock_t lock; /* IRQ synchronization */
 	u32 bus_clk_rate;
-	u8 *buf;
-	u8 addr;
 	u32 msg_read;
 	u32 isr_status;
-	spinlock_t lock;	/* IRQ synchronization */
+	u8 *buf;
+	u8 addr;
 };
-
-static void mpfs_i2c_int_clear(struct mpfs_i2c_dev *idev)
-{
-	u8 ctrl = readl(idev->base + MPFS_I2C_CTRL);
-
-	ctrl &= ~(1 << CTRL_SI);
-	writel(ctrl, idev->base + MPFS_I2C_CTRL);
-}
 
 static void mpfs_i2c_core_disable(struct mpfs_i2c_dev *idev)
 {
@@ -156,54 +149,51 @@ static inline void mpfs_i2c_stop(struct mpfs_i2c_dev *idev)
 	writel(ctrl, idev->base + MPFS_I2C_CTRL);
 }
 
-static inline int mpfs_generate_divisor(u32 rate, u8 *code)
+static inline int mpfs_i2c_set_divisor(u32 rate, struct mpfs_i2c_dev *idev)
 {
-	int ret = 0;
+	u8 clkval, ctrl;
 
 	if (rate >= 960)
-		*code = PCLK_DIV_960;
+		clkval = PCLK_DIV_960;
 	else if (rate >= 256)
-		*code = PCLK_DIV_256;
+		clkval = PCLK_DIV_256;
 	else if (rate >= 224)
-		*code = PCLK_DIV_224;
+		clkval = PCLK_DIV_224;
 	else if (rate >= 192)
-		*code = PCLK_DIV_192;
+		clkval = PCLK_DIV_192;
 	else if (rate >= 160)
-		*code = PCLK_DIV_160;
+		clkval = PCLK_DIV_160;
 	else if (rate >= 120)
-		*code = PCLK_DIV_120;
+		clkval = PCLK_DIV_120;
 	else if (rate >= 60)
-		*code = PCLK_DIV_60;
+		clkval = PCLK_DIV_60;
 	else if (rate >= 8)
-		*code = BCLK_DIV_8;
+		clkval = BCLK_DIV_8;
 	else
-		ret = -1;
+		return -EINVAL;
 
-	return ret;
+	ctrl = readl(idev->base + MPFS_I2C_CTRL);
+	ctrl &= ~CLK_MASK;
+	ctrl |= clkval;
+	writel(ctrl, idev->base + MPFS_I2C_CTRL);
+
+	ctrl = readl(idev->base + MPFS_I2C_CTRL);
+	if ((ctrl & CLK_MASK) != clkval)
+		return -EIO;
+
+	return 0;
 }
 
 static int mpfs_i2c_init(struct mpfs_i2c_dev *idev)
 {
 	u32 clk_rate = clk_get_rate(idev->i2c_clk);
 	u32 divisor = clk_rate / idev->bus_clk_rate;
-	u8 clkval;
 	int ret;
-	u8 ctrl = readl(idev->base + MPFS_I2C_CTRL);
 
-	ctrl &= ~CLK_MASK;
-
-	ret = mpfs_generate_divisor(divisor, &clkval);
-
+	ret = mpfs_i2c_set_divisor(divisor, idev);
 	if (ret)
-		return -1;
+		return ret;
 
-	ctrl |= clkval;
-
-	writel(ctrl, idev->base + MPFS_I2C_CTRL);
-
-	ctrl = readl(idev->base + MPFS_I2C_CTRL);
-
-	/* Reset controller */
 	mpfs_i2c_reset(idev);
 
 	return 0;
@@ -239,10 +229,8 @@ static int mpfs_i2c_fill_tx(struct mpfs_i2c_dev *idev)
 	return 0;
 }
 
-static irqreturn_t mpfs_i2c_handle_isr(int irq, void *_dev)
+static irqreturn_t mpfs_i2c_handle_isr(struct mpfs_i2c_dev *idev)
 {
-	bool read, finish = false;
-	struct mpfs_i2c_dev *idev = _dev;
 	u32 status = idev->isr_status;
 	u8 ctrl;
 
@@ -250,8 +238,6 @@ static irqreturn_t mpfs_i2c_handle_isr(int irq, void *_dev)
 		dev_warn(idev->dev, "unexpected interrupt\n");
 		return IRQ_HANDLED;
 	}
-
-	read = idev->msg_read ? 1 : 0;
 
 	switch (status) {
 	case STATUS_M_START_SENT:
@@ -261,71 +247,54 @@ static irqreturn_t mpfs_i2c_handle_isr(int irq, void *_dev)
 		writel(idev->addr, idev->base + MPFS_I2C_DATA);
 		writel(ctrl, idev->base + MPFS_I2C_CTRL);
 		if (idev->msg_len <= 0)
-			finish = true;
+			goto finished;
 		break;
 	case STATUS_M_ARB_LOST:
-		/* handle Lost Arbitration */
 		idev->msg_err = -EAGAIN;
-		finish = true;
-		break;
+		goto finished;
 	case STATUS_M_SLAW_ACK:
 	case STATUS_M_TX_DATA_ACK:
-		if (idev->msg_len > 0) {
+		if (idev->msg_len > 0)
 			mpfs_i2c_fill_tx(idev);
-		} else {
-			/* On the last byte to be transmitted, send STOP */
-			mpfs_i2c_stop(idev);
-			finish = true;
-		}
+		else
+			goto last_byte;
 		break;
 	case STATUS_M_TX_DATA_NACK:
 	case STATUS_M_SLAR_NACK:
 	case STATUS_M_SLAW_NACK:
 		idev->msg_err = -ENXIO;
-		mpfs_i2c_stop(idev);
-		finish = true;
-		break;
+		goto last_byte;
 	case STATUS_M_SLAR_ACK:
-		if (idev->msg_len > 1u)
-		{
-			ctrl = readl(idev->base + MPFS_I2C_CTRL);
-			ctrl |= (1 << CTRL_AA);
-			writel(ctrl, idev->base + MPFS_I2C_CTRL);
-		}
-		else if (1u == idev->msg_len)
-		{
-			ctrl = readl(idev->base + MPFS_I2C_CTRL);
+		ctrl = readl(idev->base + MPFS_I2C_CTRL);
+		if (idev->msg_len == 1u) {
 			ctrl &= ~(1 << CTRL_AA);
 			writel(ctrl, idev->base + MPFS_I2C_CTRL);
-		}
-		else {
-			ctrl = readl(idev->base + MPFS_I2C_CTRL);
+		} else {
 			ctrl |= (1 << CTRL_AA);
 			writel(ctrl, idev->base + MPFS_I2C_CTRL);
-			/* On the last byte to be transmitted, send STOP */
-			mpfs_i2c_stop(idev);
-			finish = true;
 		}
+		if (idev->msg_len < 1u)
+			goto last_byte;
 		break;
 	case STATUS_M_RX_DATA_ACKED:
 		mpfs_i2c_empty_rx(idev);
 		break;
 	case STATUS_M_RX_DATA_NACKED:
 		mpfs_i2c_empty_rx(idev);
-		if (idev->msg_len == 0) {
-			/* On the last byte to be transmitted, send STOP */
-			mpfs_i2c_stop(idev);
-			finish = true;
-		}
+		if (idev->msg_len == 0)
+			goto last_byte;
 		break;
 	default:
 		break;
 	}
 
-	if (finish) {
-		complete(&idev->msg_complete);
-	}
+	return IRQ_HANDLED;
 
+last_byte:
+	/* On the last byte to be transmitted, send STOP */
+	mpfs_i2c_stop(idev);
+finished:
+	complete(&idev->msg_complete);
 	return IRQ_HANDLED;
 }
 
@@ -334,15 +303,18 @@ static irqreturn_t mpfs_i2c_isr(int irq, void *_dev)
 	struct mpfs_i2c_dev *idev = _dev;
 	irqreturn_t ret = IRQ_NONE;
 	int si_bit = 0;
+	u8 ctrl;
 
 	si_bit = readl(idev->base + MPFS_I2C_CTRL);
 	if (si_bit & (1 << CTRL_SI)) {
 		idev->isr_status = readl(idev->base + MPFS_I2C_STATUS);
-		ret = mpfs_i2c_handle_isr(irq, idev);
+		ret = mpfs_i2c_handle_isr(idev);
 	}
 
-	// Clear the si flag
-	mpfs_i2c_int_clear(idev);
+	/* Clear the si flag */
+	ctrl = readl(idev->base + MPFS_I2C_CTRL);
+	ctrl &= ~(1 << CTRL_SI);
+	writel(ctrl, idev->base + MPFS_I2C_CTRL);
 
 	return ret;
 }
@@ -366,15 +338,11 @@ static int mpfs_i2c_xfer_msg(struct mpfs_i2c_dev *idev, struct i2c_msg *msg)
 	mpfs_i2c_core_enable(idev);
 
 	ctrl = readl(idev->base + MPFS_I2C_CTRL);
-
 	ctrl |= (1 << CTRL_STA);
-
 	writel(ctrl, idev->base + MPFS_I2C_CTRL);
 
-	time_left = wait_for_completion_timeout(&idev->msg_complete,
-						MICROCHIP_I2C_TIMEOUT);
-
-	if (time_left == 0)
+	time_left = wait_for_completion_timeout(&idev->msg_complete, MICROCHIP_I2C_TIMEOUT);
+	if (!time_left)
 		return -ETIMEDOUT;
 
 	return idev->msg_err;
@@ -415,62 +383,46 @@ static int mpfs_i2c_probe(struct platform_device *pdev)
 	if (!idev)
 		return -ENOMEM;
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	idev->base = devm_ioremap_resource(&pdev->dev, res);
+	idev->base = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
 	if (IS_ERR(idev->base))
 		return PTR_ERR(idev->base);
 
 	irq = platform_get_irq(pdev, 0);
-	if (irq < 0) {
-		dev_err(&pdev->dev, "missing interrupt resource\n");
-		return irq;
-	}
+	if (irq < 0)
+		return dev_err_probe(&pdev->dev, irq, "missing interrupt resource\n");
 
 	idev->i2c_clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(idev->i2c_clk)) {
-		dev_err(&pdev->dev, "missing clock\n");
-		return PTR_ERR(idev->i2c_clk);
-	}
+	if (IS_ERR(idev->i2c_clk))
+		return dev_err_probe(&pdev->dev, PTR_ERR(idev->i2c_clk), "missing clock\n");
 
 	idev->dev = &pdev->dev;
 	init_completion(&idev->msg_complete);
 	spin_lock_init(&idev->lock);
 
-	val = device_property_read_u32(idev->dev, "clock-frequency",
-				       &idev->bus_clk_rate);
+	val = device_property_read_u32(idev->dev, "clock-frequency", &idev->bus_clk_rate);
 	if (val) {
 		dev_info(&pdev->dev, "default to 100kHz\n");
-		idev->bus_clk_rate = 100000;	/* default clock rate */
+		idev->bus_clk_rate = 100000;
 	}
 
-	if (idev->bus_clk_rate > 400000) {
-		dev_err(&pdev->dev, "invalid clock-frequency %d\n",
-			idev->bus_clk_rate);
-		return -EINVAL;
-	}
+	if (idev->bus_clk_rate > 400000)
+		return dev_err_probe(&pdev->dev, -EINVAL,
+				     "clock-frequency too high: %d\n", idev->bus_clk_rate);
 
-	ret = devm_request_irq(&pdev->dev, irq, mpfs_i2c_isr,
-			       IRQF_SHARED, pdev->name, idev);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to claim irq %d\n", irq);
-		return ret;
-	}
+	ret = devm_request_irq(&pdev->dev, irq, mpfs_i2c_isr, IRQF_SHARED, pdev->name, idev);
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret, "failed to claim irq %d\n", irq);
 
 	ret = clk_prepare_enable(idev->i2c_clk);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to enable clock\n");
-		return ret;
-	}
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret, "failed to enable clock\n");
 
 	ret = mpfs_i2c_init(idev);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to program clock divider\n");
-		return ret;
-	}
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret, "failed to program clock divider\n");
 
 	i2c_set_adapdata(&idev->adapter, idev);
-	snprintf(idev->adapter.name, sizeof(idev->adapter.name),
-		 "Microchip I2C hw bus");
+	snprintf(idev->adapter.name, sizeof(idev->adapter.name),  "Microchip I2C hw bus");
 	idev->adapter.owner = THIS_MODULE;
 	idev->adapter.algo = &mpfs_i2c_algo;
 	idev->adapter.dev.parent = &pdev->dev;
@@ -499,7 +451,6 @@ static int mpfs_i2c_remove(struct platform_device *pdev)
 	return 0;
 }
 
-/* Match table for of_platform binding */
 static const struct of_device_id mpfs_i2c_of_match[] = {
 	{ .compatible = "microchip,mpfs-i2c" },
 	{ .compatible = "microchip,corei2c-rtl-v7" },
@@ -511,13 +462,14 @@ static struct platform_driver mpfs_i2c_driver = {
 	.probe = mpfs_i2c_probe,
 	.remove = mpfs_i2c_remove,
 	.driver = {
-		.name = "microchip-mpfs-i2c",
+		.name = "microchip-corei2c",
 		.of_match_table = mpfs_i2c_of_match,
 	},
 };
 
 module_platform_driver(mpfs_i2c_driver);
 
-MODULE_DESCRIPTION("Microchip I2C bus driver");
-MODULE_AUTHOR("Microchip Corporation");
+MODULE_DESCRIPTION("Microchip CoreI2C bus driver");
+MODULE_AUTHOR("Daire McNamara <daire.mcnamara@microchip.com>");
+MODULE_AUTHOR("Conor Dooley <conor.dooley@microchip.com>");
 MODULE_LICENSE("GPL v2");
