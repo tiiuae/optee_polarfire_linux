@@ -20,16 +20,16 @@
 
 #define MICROCHIP_I2C_TIMEOUT (msecs_to_jiffies(1000))
 
-#define MPFS_I2C_CTRL				(0x00)
-#define   CTRL_CR0				(0x00)
-#define   CTRL_CR1				(0x01)
-#define   CTRL_AA				(0x02)
-#define   CTRL_SI				(0x03)
-#define   CTRL_STO				(0x04)
-#define   CTRL_STA				(0x05)
-#define   CTRL_ENS1				(0x06)
-#define   CTRL_CR2				(0x07)
-#define MPFS_I2C_STATUS				(0x04)
+#define CORE_I2C_CTRL				(0x00)
+#define   CTRL_CR0				BIT(0)
+#define   CTRL_CR1				BIT(1)
+#define   CTRL_AA				BIT(2)
+#define   CTRL_SI				BIT(3)
+#define   CTRL_STO				BIT(4)
+#define   CTRL_STA				BIT(5)
+#define   CTRL_ENS1				BIT(6)
+#define   CTRL_CR2				BIT(7)
+#define CORE_I2C_STATUS				(0x04)
 #define   STATUS_BUS_ERROR			(0x00)
 #define   STATUS_M_START_SENT			(0x08)
 #define   STATUS_M_REPEATED_START_SENT		(0x10)
@@ -59,13 +59,13 @@
 #define   STATUS_M_SMB_MASTER_RESET		(0xD0)
 #define   STATUS_S_SCL_LOW_TIMEOUT		(0xD8) /* 25 ms */
 #define   STATUS_NO_STATE_INFO			(0xF8)
-#define MPFS_I2C_DATA				(0x08)
+#define CORE_I2C_DATA				(0x08)
 #define   WRITE_BIT				(0x0)
 #define   READ_BIT				(0x1)
 #define   SLAVE_ADDR_SHIFT			(1)
-#define MPFS_I2C_SLAVE0_ADDR			(0x0c)
+#define CORE_I2C_SLAVE0_ADDR			(0x0c)
 #define   GENERAL_CALL_BIT			(0x0)
-#define MPFS_I2C_SMBUS				(0x10)
+#define CORE_I2C_SMBUS				(0x10)
 #define   SMBALERT_INT_ENB			(0x0)
 #define   SMBSUS_INT_ENB			(0x1)
 #define   SMBUS_ENB				(0x2)
@@ -74,19 +74,19 @@
 #define   SMBSUS_NI_STATUS			(0x5)
 #define   SMBSUS_NO_CTRL			(0x6)
 #define   SMBUS_RESET				(0x7)
-#define MPFS_I2C_FREQ				(0x14)
-#define MPFS_I2C_GLITCHREG			(0x18)
-#define MPFS_I2C_SLAVE1_ADDR			(0x1c)
+#define CORE_I2C_FREQ				(0x14)
+#define CORE_I2C_GLITCHREG			(0x18)
+#define CORE_I2C_SLAVE1_ADDR			(0x1c)
 
-#define PCLK_DIV_960  ((0 << CTRL_CR0) | (0 << CTRL_CR1) | (1 << CTRL_CR2))
-#define PCLK_DIV_256  ((0 << CTRL_CR0) | (0 << CTRL_CR1) | (0 << CTRL_CR2))
-#define PCLK_DIV_224  ((1 << CTRL_CR0) | (0 << CTRL_CR1) | (0 << CTRL_CR2))
-#define PCLK_DIV_192  ((0 << CTRL_CR0) | (1 << CTRL_CR1) | (0 << CTRL_CR2))
-#define PCLK_DIV_160  ((1 << CTRL_CR0) | (1 << CTRL_CR1) | (0 << CTRL_CR2))
-#define PCLK_DIV_120  ((1 << CTRL_CR0) | (0 << CTRL_CR1) | (1 << CTRL_CR2))
-#define PCLK_DIV_60   ((0 << CTRL_CR0) | (1 << CTRL_CR1) | (1 << CTRL_CR2))
-#define BCLK_DIV_8    ((1 << CTRL_CR0) | (1 << CTRL_CR1) | (1 << CTRL_CR2))
-#define CLK_MASK      ((1 << CTRL_CR0) | (1 << CTRL_CR1) | (1 << CTRL_CR2))
+#define PCLK_DIV_960  (CTRL_CR2)
+#define PCLK_DIV_256  (0)
+#define PCLK_DIV_224  (CTRL_CR0)
+#define PCLK_DIV_192  (CTRL_CR1)
+#define PCLK_DIV_160  (CTRL_CR0 | CTRL_CR1)
+#define PCLK_DIV_120  (CTRL_CR0 | CTRL_CR2)
+#define PCLK_DIV_60   (CTRL_CR1 | CTRL_CR2)
+#define BCLK_DIV_8    (CTRL_CR0 | CTRL_CR1 | CTRL_CR2)
+#define CLK_MASK      (CTRL_CR0 | CTRL_CR1 | CTRL_CR2)
 
 /*
  * mpfs_i2c_dev - I2C device context
@@ -121,18 +121,18 @@ struct mpfs_i2c_dev {
 
 static void mpfs_i2c_core_disable(struct mpfs_i2c_dev *idev)
 {
-	u8 ctrl = readl(idev->base + MPFS_I2C_CTRL);
+	u8 ctrl = readl(idev->base + CORE_I2C_CTRL);
 
-	ctrl &= ~(1 << CTRL_ENS1);
-	writel(ctrl, idev->base + MPFS_I2C_CTRL);
+	ctrl &= ~CTRL_ENS1;
+	writel(ctrl, idev->base + CORE_I2C_CTRL);
 }
 
 static void mpfs_i2c_core_enable(struct mpfs_i2c_dev *idev)
 {
-	u8 ctrl = readl(idev->base + MPFS_I2C_CTRL);
+	u8 ctrl = readl(idev->base + CORE_I2C_CTRL);
 
-	ctrl |= (1 << CTRL_ENS1);
-	writel(ctrl, idev->base + MPFS_I2C_CTRL);
+	ctrl |= CTRL_ENS1;
+	writel(ctrl, idev->base + CORE_I2C_CTRL);
 }
 
 static void mpfs_i2c_reset(struct mpfs_i2c_dev *idev)
@@ -143,10 +143,10 @@ static void mpfs_i2c_reset(struct mpfs_i2c_dev *idev)
 
 static inline void mpfs_i2c_stop(struct mpfs_i2c_dev *idev)
 {
-	u8 ctrl = readl(idev->base + MPFS_I2C_CTRL);
+	u8 ctrl = readl(idev->base + CORE_I2C_CTRL);
 
-	ctrl |= (1 << CTRL_STO);
-	writel(ctrl, idev->base + MPFS_I2C_CTRL);
+	ctrl |= CTRL_STO;
+	writel(ctrl, idev->base + CORE_I2C_CTRL);
 }
 
 static inline int mpfs_i2c_set_divisor(u32 rate, struct mpfs_i2c_dev *idev)
@@ -172,12 +172,12 @@ static inline int mpfs_i2c_set_divisor(u32 rate, struct mpfs_i2c_dev *idev)
 	else
 		return -EINVAL;
 
-	ctrl = readl(idev->base + MPFS_I2C_CTRL);
+	ctrl = readl(idev->base + CORE_I2C_CTRL);
 	ctrl &= ~CLK_MASK;
 	ctrl |= clkval;
-	writel(ctrl, idev->base + MPFS_I2C_CTRL);
+	writel(ctrl, idev->base + CORE_I2C_CTRL);
 
-	ctrl = readl(idev->base + MPFS_I2C_CTRL);
+	ctrl = readl(idev->base + CORE_I2C_CTRL);
 	if ((ctrl & CLK_MASK) != clkval)
 		return -EIO;
 
@@ -202,7 +202,7 @@ static int mpfs_i2c_init(struct mpfs_i2c_dev *idev)
 static void mpfs_i2c_transfer(struct mpfs_i2c_dev *idev, u32 data)
 {
 	if (idev->msg_len > 0)
-		writel(data, idev->base + MPFS_I2C_DATA);
+		writel(data, idev->base + CORE_I2C_DATA);
 }
 
 static void mpfs_i2c_empty_rx(struct mpfs_i2c_dev *idev)
@@ -210,14 +210,14 @@ static void mpfs_i2c_empty_rx(struct mpfs_i2c_dev *idev)
 	u8 ctrl;
 
 	if (idev->msg_len > 0) {
-		*idev->buf++ = readl(idev->base + MPFS_I2C_DATA);
+		*idev->buf++ = readl(idev->base + CORE_I2C_DATA);
 		idev->msg_len--;
 	}
 
 	if (idev->msg_len == 0) {
-		ctrl = readl(idev->base + MPFS_I2C_CTRL);
-		ctrl &= ~(1 << CTRL_AA);
-		writel(ctrl, idev->base + MPFS_I2C_CTRL);
+		ctrl = readl(idev->base + CORE_I2C_CTRL);
+		ctrl &= ~CTRL_AA;
+		writel(ctrl, idev->base + CORE_I2C_CTRL);
 	}
 }
 
@@ -242,10 +242,10 @@ static irqreturn_t mpfs_i2c_handle_isr(struct mpfs_i2c_dev *idev)
 	switch (status) {
 	case STATUS_M_START_SENT:
 	case STATUS_M_REPEATED_START_SENT:
-		ctrl = readl(idev->base + MPFS_I2C_CTRL);
-		ctrl &= ~(1 << CTRL_STA);
-		writel(idev->addr, idev->base + MPFS_I2C_DATA);
-		writel(ctrl, idev->base + MPFS_I2C_CTRL);
+		ctrl = readl(idev->base + CORE_I2C_CTRL);
+		ctrl &= ~CTRL_STA;
+		writel(idev->addr, idev->base + CORE_I2C_DATA);
+		writel(ctrl, idev->base + CORE_I2C_CTRL);
 		if (idev->msg_len <= 0)
 			goto finished;
 		break;
@@ -265,13 +265,13 @@ static irqreturn_t mpfs_i2c_handle_isr(struct mpfs_i2c_dev *idev)
 		idev->msg_err = -ENXIO;
 		goto last_byte;
 	case STATUS_M_SLAR_ACK:
-		ctrl = readl(idev->base + MPFS_I2C_CTRL);
+		ctrl = readl(idev->base + CORE_I2C_CTRL);
 		if (idev->msg_len == 1u) {
-			ctrl &= ~(1 << CTRL_AA);
-			writel(ctrl, idev->base + MPFS_I2C_CTRL);
+			ctrl &= ~CTRL_AA;
+			writel(ctrl, idev->base + CORE_I2C_CTRL);
 		} else {
-			ctrl |= (1 << CTRL_AA);
-			writel(ctrl, idev->base + MPFS_I2C_CTRL);
+			ctrl |= CTRL_AA;
+			writel(ctrl, idev->base + CORE_I2C_CTRL);
 		}
 		if (idev->msg_len < 1u)
 			goto last_byte;
@@ -302,19 +302,18 @@ static irqreturn_t mpfs_i2c_isr(int irq, void *_dev)
 {
 	struct mpfs_i2c_dev *idev = _dev;
 	irqreturn_t ret = IRQ_NONE;
-	int si_bit = 0;
 	u8 ctrl;
 
-	si_bit = readl(idev->base + MPFS_I2C_CTRL);
-	if (si_bit & (1 << CTRL_SI)) {
-		idev->isr_status = readl(idev->base + MPFS_I2C_STATUS);
+	ctrl = readl(idev->base + CORE_I2C_CTRL);
+	if (ctrl & CTRL_SI) {
+		idev->isr_status = readl(idev->base + CORE_I2C_STATUS);
 		ret = mpfs_i2c_handle_isr(idev);
 	}
 
 	/* Clear the si flag */
-	ctrl = readl(idev->base + MPFS_I2C_CTRL);
-	ctrl &= ~(1 << CTRL_SI);
-	writel(ctrl, idev->base + MPFS_I2C_CTRL);
+	ctrl = readl(idev->base + CORE_I2C_CTRL);
+	ctrl &= ~CTRL_SI;
+	writel(ctrl, idev->base + CORE_I2C_CTRL);
 
 	return ret;
 }
@@ -337,9 +336,9 @@ static int mpfs_i2c_xfer_msg(struct mpfs_i2c_dev *idev, struct i2c_msg *msg)
 
 	mpfs_i2c_core_enable(idev);
 
-	ctrl = readl(idev->base + MPFS_I2C_CTRL);
-	ctrl |= (1 << CTRL_STA);
-	writel(ctrl, idev->base + MPFS_I2C_CTRL);
+	ctrl = readl(idev->base + CORE_I2C_CTRL);
+	ctrl |= CTRL_STA;
+	writel(ctrl, idev->base + CORE_I2C_CTRL);
 
 	time_left = wait_for_completion_timeout(&idev->msg_complete, MICROCHIP_I2C_TIMEOUT);
 	if (!time_left)
