@@ -28,18 +28,24 @@
 		status = "disabled";
 	};
 
-	fabric_clk3: clk {
+	fabric_clk3: clk@1 {
 		compatible = "fixed-clock";
 		#clock-cells = <0>;
 		clock-frequency = <62500000>;
 		clock-output-names = "fclk";
+	};	
+	
+	fabric_clk125: clk@2 {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <125000000>;
 	};
 
 	core_pwm0: pwm@41000000 {
 		compatible = "microchip,corepwm-rtl-v4";
 		reg = <0x0 0x41000000 0x0 0xF0>;
-		microchip,sync-update = /bits/ 16 <0>;
-		clocks = <&clkcfg CLK_FIC3>;
+		microchip,sync-update-mask = /bits/ 32 <0>;
+		clocks = <&fabric_clk3>;
 		#pwm-cells = <2>;
 		status = "disabled";
 	};
