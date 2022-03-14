@@ -2,9 +2,9 @@
 /*
  * Microchip PolarFire SoC (MPFS) hardware random driver
  *
- * Copyright (c) 2020 Microchip Corporation. All rights reserved.
+ * Copyright (c) 2020-2022 Microchip Corporation. All rights reserved.
  *
- * Author:
+ * Author: Conor Dooley <conor.dooley@microchip.com>
  *
  */
 
@@ -31,26 +31,26 @@ static struct mpfs_rng_priv {
 static int mpfs_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 {
 	struct mpfs_rng_priv *rng_priv = (struct mpfs_rng_priv *)rng->priv;
-
+	int ret, i;
 	u32 max_words = max / sizeof(u32);
 	u32 num_words_rx = 0;
 	u32 num_requests;
 	u32 response_msg[RESP_SIZE];
-	u16 i;
 	u16 copy_size_bytes;
-	int ret;
 
 	struct mpfs_mss_response response = {
 		.resp_status = 0U,
 		.resp_msg = (u32 *)response_msg,
 		.resp_size = RNG_RESP_BYTES
 	};
-	struct mpfs_mss_msg msg = { .cmd_opcode = CMD_OPCODE,
-				    .cmd_data_size = CMD_DATA_SIZE,
-				    .response = &response,
-				    .cmd_data = CMD_DATA,
-				    .mbox_offset = MBOX_OFFSET,
-				    .resp_offset = RESP_OFFSET };
+	struct mpfs_mss_msg msg = {
+		.cmd_opcode = CMD_OPCODE,
+		.cmd_data_size = CMD_DATA_SIZE,
+		.response = &response,
+		.cmd_data = CMD_DATA,
+		.mbox_offset = MBOX_OFFSET,
+		.resp_offset = RESP_OFFSET
+	};
 
 	if (!max)
 		return 0;
@@ -73,7 +73,6 @@ static int mpfs_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 
 static int mpfs_rng_probe(struct platform_device *pdev)
 {
-	struct device_node *node_pointer;
 	struct device *dev = &pdev->dev;
 	struct mpfs_rng_priv *rng_priv;
 	int ret;
@@ -82,17 +81,10 @@ static int mpfs_rng_probe(struct platform_device *pdev)
 	if (!rng_priv)
 		return -ENOMEM;
 
-	node_pointer = of_get_parent(dev->of_node);
-	if (!node_pointer) {
-		dev_err(&pdev->dev,
-			"Failed to find mpfs system controller node\n");
-		return -ENODEV;
-	}
-
-	rng_priv->sys_controller =  mpfs_sys_controller_get(&pdev->dev, node_pointer);
-	of_node_put(node_pointer);
-	if (!rng_priv->sys_controller)
-		return -EPROBE_DEFER;
+	rng_priv->sys_controller =  mpfs_sys_controller_get(&pdev->dev);
+	if (IS_ERR(rng_priv->sys_controller))
+		return dev_err_probe(dev, PTR_ERR(rng_priv->sys_controller),
+				     "Could not register as a sub device of the system controller\n");
 
 	rng_priv->ops.priv = (unsigned long) rng_priv;
 	rng_priv->ops.read = mpfs_rng_read;
@@ -101,20 +93,16 @@ static int mpfs_rng_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, rng_priv);
 
 	ret = devm_hwrng_register(&pdev->dev, &rng_priv->ops);
-	if (ret) {
-		dev_err(&pdev->dev, "Failed to register HW RNG\n");
-		return ret;
-	}
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret, "Failed to register MPFS hwrng\n");
 
-	dev_info(&pdev->dev, "Successfully registered HW RNG\n");
+	dev_info(&pdev->dev, "Registered MPFS hwrng\n");
 
 	return 0;
 }
 
 static const struct of_device_id mpfs_rng_of_match[] = {
-	{
-		.compatible = "microchip,mpfs-rng",
-	},
+	{ .compatible = "microchip,mpfs-rng", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, mpfs_rng_of_match);
@@ -130,4 +118,4 @@ module_platform_driver(mpfs_rng_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Conor Dooley <conor.dooley@microchip.com>");
-MODULE_DESCRIPTION("mpfs mailbox client driver");
+MODULE_DESCRIPTION("MPFS hwrng driver");
