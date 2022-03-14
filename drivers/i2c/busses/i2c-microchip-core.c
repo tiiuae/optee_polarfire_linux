@@ -89,7 +89,7 @@
 #define CLK_MASK      (CTRL_CR0 | CTRL_CR1 | CTRL_CR2)
 
 /*
- * mpfs_i2c_dev - I2C device context
+ * mchp_corei2c_dev - I2C device context
  * @base: pointer to register struct
  * @msg: pointer to current message
  * @msg_len: number of bytes transferred in msg
@@ -103,7 +103,7 @@
  * @isr_status: cached copy of local ISR status.
  * @lock: spinlock for IRQ synchronization.
  */
-struct mpfs_i2c_dev {
+struct mchp_corei2c_dev {
 	void __iomem *base;
 	size_t msg_len;
 	int msg_err;
@@ -119,7 +119,7 @@ struct mpfs_i2c_dev {
 	u8 addr;
 };
 
-static void mpfs_i2c_core_disable(struct mpfs_i2c_dev *idev)
+static void mchp_corei2c_core_disable(struct mchp_corei2c_dev *idev)
 {
 	u8 ctrl = readl(idev->base + CORE_I2C_CTRL);
 
@@ -127,7 +127,7 @@ static void mpfs_i2c_core_disable(struct mpfs_i2c_dev *idev)
 	writel(ctrl, idev->base + CORE_I2C_CTRL);
 }
 
-static void mpfs_i2c_core_enable(struct mpfs_i2c_dev *idev)
+static void mchp_corei2c_core_enable(struct mchp_corei2c_dev *idev)
 {
 	u8 ctrl = readl(idev->base + CORE_I2C_CTRL);
 
@@ -135,13 +135,13 @@ static void mpfs_i2c_core_enable(struct mpfs_i2c_dev *idev)
 	writel(ctrl, idev->base + CORE_I2C_CTRL);
 }
 
-static void mpfs_i2c_reset(struct mpfs_i2c_dev *idev)
+static void mchp_corei2c_reset(struct mchp_corei2c_dev *idev)
 {
-	mpfs_i2c_core_disable(idev);
-	mpfs_i2c_core_enable(idev);
+	mchp_corei2c_core_disable(idev);
+	mchp_corei2c_core_enable(idev);
 }
 
-static inline void mpfs_i2c_stop(struct mpfs_i2c_dev *idev)
+static inline void mchp_corei2c_stop(struct mchp_corei2c_dev *idev)
 {
 	u8 ctrl = readl(idev->base + CORE_I2C_CTRL);
 
@@ -149,7 +149,7 @@ static inline void mpfs_i2c_stop(struct mpfs_i2c_dev *idev)
 	writel(ctrl, idev->base + CORE_I2C_CTRL);
 }
 
-static inline int mpfs_i2c_set_divisor(u32 rate, struct mpfs_i2c_dev *idev)
+static inline int mchp_corei2c_set_divisor(u32 rate, struct mchp_corei2c_dev *idev)
 {
 	u8 clkval, ctrl;
 
@@ -184,28 +184,28 @@ static inline int mpfs_i2c_set_divisor(u32 rate, struct mpfs_i2c_dev *idev)
 	return 0;
 }
 
-static int mpfs_i2c_init(struct mpfs_i2c_dev *idev)
+static int mchp_corei2c_init(struct mchp_corei2c_dev *idev)
 {
 	u32 clk_rate = clk_get_rate(idev->i2c_clk);
 	u32 divisor = clk_rate / idev->bus_clk_rate;
 	int ret;
 
-	ret = mpfs_i2c_set_divisor(divisor, idev);
+	ret = mchp_corei2c_set_divisor(divisor, idev);
 	if (ret)
 		return ret;
 
-	mpfs_i2c_reset(idev);
+	mchp_corei2c_reset(idev);
 
 	return 0;
 }
 
-static void mpfs_i2c_transfer(struct mpfs_i2c_dev *idev, u32 data)
+static void mchp_corei2c_transfer(struct mchp_corei2c_dev *idev, u32 data)
 {
 	if (idev->msg_len > 0)
 		writel(data, idev->base + CORE_I2C_DATA);
 }
 
-static void mpfs_i2c_empty_rx(struct mpfs_i2c_dev *idev)
+static void mchp_corei2c_empty_rx(struct mchp_corei2c_dev *idev)
 {
 	u8 ctrl;
 
@@ -221,15 +221,15 @@ static void mpfs_i2c_empty_rx(struct mpfs_i2c_dev *idev)
 	}
 }
 
-static int mpfs_i2c_fill_tx(struct mpfs_i2c_dev *idev)
+static int mchp_corei2c_fill_tx(struct mchp_corei2c_dev *idev)
 {
-	mpfs_i2c_transfer(idev, *idev->buf++);
+	mchp_corei2c_transfer(idev, *idev->buf++);
 	idev->msg_len--;
 
 	return 0;
 }
 
-static irqreturn_t mpfs_i2c_handle_isr(struct mpfs_i2c_dev *idev)
+static irqreturn_t mchp_corei2c_handle_isr(struct mchp_corei2c_dev *idev)
 {
 	u32 status = idev->isr_status;
 	u8 ctrl;
@@ -255,7 +255,7 @@ static irqreturn_t mpfs_i2c_handle_isr(struct mpfs_i2c_dev *idev)
 	case STATUS_M_SLAW_ACK:
 	case STATUS_M_TX_DATA_ACK:
 		if (idev->msg_len > 0)
-			mpfs_i2c_fill_tx(idev);
+			mchp_corei2c_fill_tx(idev);
 		else
 			goto last_byte;
 		break;
@@ -277,10 +277,10 @@ static irqreturn_t mpfs_i2c_handle_isr(struct mpfs_i2c_dev *idev)
 			goto last_byte;
 		break;
 	case STATUS_M_RX_DATA_ACKED:
-		mpfs_i2c_empty_rx(idev);
+		mchp_corei2c_empty_rx(idev);
 		break;
 	case STATUS_M_RX_DATA_NACKED:
-		mpfs_i2c_empty_rx(idev);
+		mchp_corei2c_empty_rx(idev);
 		if (idev->msg_len == 0)
 			goto last_byte;
 		break;
@@ -292,22 +292,22 @@ static irqreturn_t mpfs_i2c_handle_isr(struct mpfs_i2c_dev *idev)
 
 last_byte:
 	/* On the last byte to be transmitted, send STOP */
-	mpfs_i2c_stop(idev);
+	mchp_corei2c_stop(idev);
 finished:
 	complete(&idev->msg_complete);
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t mpfs_i2c_isr(int irq, void *_dev)
+static irqreturn_t mchp_corei2c_isr(int irq, void *_dev)
 {
-	struct mpfs_i2c_dev *idev = _dev;
+	struct mchp_corei2c_dev *idev = _dev;
 	irqreturn_t ret = IRQ_NONE;
 	u8 ctrl;
 
 	ctrl = readl(idev->base + CORE_I2C_CTRL);
 	if (ctrl & CTRL_SI) {
 		idev->isr_status = readl(idev->base + CORE_I2C_STATUS);
-		ret = mpfs_i2c_handle_isr(idev);
+		ret = mchp_corei2c_handle_isr(idev);
 	}
 
 	/* Clear the si flag */
@@ -318,7 +318,7 @@ static irqreturn_t mpfs_i2c_isr(int irq, void *_dev)
 	return ret;
 }
 
-static int mpfs_i2c_xfer_msg(struct mpfs_i2c_dev *idev, struct i2c_msg *msg)
+static int mchp_corei2c_xfer_msg(struct mchp_corei2c_dev *idev, struct i2c_msg *msg)
 {
 	u8 ctrl;
 	unsigned long time_left;
@@ -334,7 +334,7 @@ static int mpfs_i2c_xfer_msg(struct mpfs_i2c_dev *idev, struct i2c_msg *msg)
 
 	reinit_completion(&idev->msg_complete);
 
-	mpfs_i2c_core_enable(idev);
+	mchp_corei2c_core_enable(idev);
 
 	ctrl = readl(idev->base + CORE_I2C_CTRL);
 	ctrl |= CTRL_STA;
@@ -347,13 +347,13 @@ static int mpfs_i2c_xfer_msg(struct mpfs_i2c_dev *idev, struct i2c_msg *msg)
 	return idev->msg_err;
 }
 
-static int mpfs_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+static int mchp_corei2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
-	struct mpfs_i2c_dev *idev = i2c_get_adapdata(adap);
+	struct mchp_corei2c_dev *idev = i2c_get_adapdata(adap);
 	int i, ret;
 
 	for (i = 0; i < num; i++) {
-		ret = mpfs_i2c_xfer_msg(idev, msgs++);
+		ret = mchp_corei2c_xfer_msg(idev, msgs++);
 		if (ret)
 			return ret;
 	}
@@ -361,19 +361,19 @@ static int mpfs_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num
 	return num;
 }
 
-static u32 mpfs_i2c_func(struct i2c_adapter *adap)
+static u32 mchp_corei2c_func(struct i2c_adapter *adap)
 {
 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
 }
 
-static const struct i2c_algorithm mpfs_i2c_algo = {
-	.master_xfer = mpfs_i2c_xfer,
-	.functionality = mpfs_i2c_func,
+static const struct i2c_algorithm mchp_corei2c_algo = {
+	.master_xfer = mchp_corei2c_xfer,
+	.functionality = mchp_corei2c_func,
 };
 
-static int mpfs_i2c_probe(struct platform_device *pdev)
+static int mchp_corei2c_probe(struct platform_device *pdev)
 {
-	struct mpfs_i2c_dev *idev = NULL;
+	struct mchp_corei2c_dev *idev = NULL;
 	struct resource *res;
 	int irq, ret;
 	u32 val;
@@ -408,7 +408,7 @@ static int mpfs_i2c_probe(struct platform_device *pdev)
 		return dev_err_probe(&pdev->dev, -EINVAL,
 				     "clock-frequency too high: %d\n", idev->bus_clk_rate);
 
-	ret = devm_request_irq(&pdev->dev, irq, mpfs_i2c_isr, IRQF_SHARED, pdev->name, idev);
+	ret = devm_request_irq(&pdev->dev, irq, mchp_corei2c_isr, IRQF_SHARED, pdev->name, idev);
 	if (ret)
 		return dev_err_probe(&pdev->dev, ret, "failed to claim irq %d\n", irq);
 
@@ -416,14 +416,14 @@ static int mpfs_i2c_probe(struct platform_device *pdev)
 	if (ret)
 		return dev_err_probe(&pdev->dev, ret, "failed to enable clock\n");
 
-	ret = mpfs_i2c_init(idev);
+	ret = mchp_corei2c_init(idev);
 	if (ret)
 		return dev_err_probe(&pdev->dev, ret, "failed to program clock divider\n");
 
 	i2c_set_adapdata(&idev->adapter, idev);
 	snprintf(idev->adapter.name, sizeof(idev->adapter.name),  "Microchip I2C hw bus");
 	idev->adapter.owner = THIS_MODULE;
-	idev->adapter.algo = &mpfs_i2c_algo;
+	idev->adapter.algo = &mchp_corei2c_algo;
 	idev->adapter.dev.parent = &pdev->dev;
 	idev->adapter.dev.of_node = pdev->dev.of_node;
 
@@ -440,9 +440,9 @@ static int mpfs_i2c_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mpfs_i2c_remove(struct platform_device *pdev)
+static int mchp_corei2c_remove(struct platform_device *pdev)
 {
-	struct mpfs_i2c_dev *idev = platform_get_drvdata(pdev);
+	struct mchp_corei2c_dev *idev = platform_get_drvdata(pdev);
 
 	clk_disable_unprepare(idev->i2c_clk);
 	i2c_del_adapter(&idev->adapter);
@@ -450,23 +450,23 @@ static int mpfs_i2c_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id mpfs_i2c_of_match[] = {
+static const struct of_device_id mchp_corei2c_of_match[] = {
 	{ .compatible = "microchip,mpfs-i2c" },
 	{ .compatible = "microchip,corei2c-rtl-v7" },
 	{},
 };
-MODULE_DEVICE_TABLE(of, mpfs_i2c_of_match);
+MODULE_DEVICE_TABLE(of, mchp_corei2c_of_match);
 
-static struct platform_driver mpfs_i2c_driver = {
-	.probe = mpfs_i2c_probe,
-	.remove = mpfs_i2c_remove,
+static struct platform_driver mchp_corei2c_driver = {
+	.probe = mchp_corei2c_probe,
+	.remove = mchp_corei2c_remove,
 	.driver = {
 		.name = "microchip-corei2c",
-		.of_match_table = mpfs_i2c_of_match,
+		.of_match_table = mchp_corei2c_of_match,
 	},
 };
 
-module_platform_driver(mpfs_i2c_driver);
+module_platform_driver(mchp_corei2c_driver);
 
 MODULE_DESCRIPTION("Microchip CoreI2C bus driver");
 MODULE_AUTHOR("Daire McNamara <daire.mcnamara@microchip.com>");
