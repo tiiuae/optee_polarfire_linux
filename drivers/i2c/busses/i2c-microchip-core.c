@@ -121,18 +121,18 @@ struct mchp_corei2c_dev {
 
 static void mchp_corei2c_core_disable(struct mchp_corei2c_dev *idev)
 {
-	u8 ctrl = readl(idev->base + CORE_I2C_CTRL);
+	u8 ctrl = readb(idev->base + CORE_I2C_CTRL);
 
 	ctrl &= ~CTRL_ENS1;
-	writel(ctrl, idev->base + CORE_I2C_CTRL);
+	writeb(ctrl, idev->base + CORE_I2C_CTRL);
 }
 
 static void mchp_corei2c_core_enable(struct mchp_corei2c_dev *idev)
 {
-	u8 ctrl = readl(idev->base + CORE_I2C_CTRL);
+	u8 ctrl = readb(idev->base + CORE_I2C_CTRL);
 
 	ctrl |= CTRL_ENS1;
-	writel(ctrl, idev->base + CORE_I2C_CTRL);
+	writeb(ctrl, idev->base + CORE_I2C_CTRL);
 }
 
 static void mchp_corei2c_reset(struct mchp_corei2c_dev *idev)
@@ -143,10 +143,10 @@ static void mchp_corei2c_reset(struct mchp_corei2c_dev *idev)
 
 static inline void mchp_corei2c_stop(struct mchp_corei2c_dev *idev)
 {
-	u8 ctrl = readl(idev->base + CORE_I2C_CTRL);
+	u8 ctrl = readb(idev->base + CORE_I2C_CTRL);
 
 	ctrl |= CTRL_STO;
-	writel(ctrl, idev->base + CORE_I2C_CTRL);
+	writeb(ctrl, idev->base + CORE_I2C_CTRL);
 }
 
 static inline int mchp_corei2c_set_divisor(u32 rate, struct mchp_corei2c_dev *idev)
@@ -172,12 +172,12 @@ static inline int mchp_corei2c_set_divisor(u32 rate, struct mchp_corei2c_dev *id
 	else
 		return -EINVAL;
 
-	ctrl = readl(idev->base + CORE_I2C_CTRL);
+	ctrl = readb(idev->base + CORE_I2C_CTRL);
 	ctrl &= ~CLK_MASK;
 	ctrl |= clkval;
-	writel(ctrl, idev->base + CORE_I2C_CTRL);
+	writeb(ctrl, idev->base + CORE_I2C_CTRL);
 
-	ctrl = readl(idev->base + CORE_I2C_CTRL);
+	ctrl = readb(idev->base + CORE_I2C_CTRL);
 	if ((ctrl & CLK_MASK) != clkval)
 		return -EIO;
 
@@ -202,7 +202,7 @@ static int mchp_corei2c_init(struct mchp_corei2c_dev *idev)
 static void mchp_corei2c_transfer(struct mchp_corei2c_dev *idev, u32 data)
 {
 	if (idev->msg_len > 0)
-		writel(data, idev->base + CORE_I2C_DATA);
+		writeb(data, idev->base + CORE_I2C_DATA);
 }
 
 static void mchp_corei2c_empty_rx(struct mchp_corei2c_dev *idev)
@@ -210,14 +210,14 @@ static void mchp_corei2c_empty_rx(struct mchp_corei2c_dev *idev)
 	u8 ctrl;
 
 	if (idev->msg_len > 0) {
-		*idev->buf++ = readl(idev->base + CORE_I2C_DATA);
+		*idev->buf++ = readb(idev->base + CORE_I2C_DATA);
 		idev->msg_len--;
 	}
 
 	if (idev->msg_len == 0) {
-		ctrl = readl(idev->base + CORE_I2C_CTRL);
+		ctrl = readb(idev->base + CORE_I2C_CTRL);
 		ctrl &= ~CTRL_AA;
-		writel(ctrl, idev->base + CORE_I2C_CTRL);
+		writeb(ctrl, idev->base + CORE_I2C_CTRL);
 	}
 }
 
@@ -234,18 +234,16 @@ static irqreturn_t mchp_corei2c_handle_isr(struct mchp_corei2c_dev *idev)
 	u32 status = idev->isr_status;
 	u8 ctrl;
 
-	if (!idev->buf) {
-		dev_warn(idev->dev, "unexpected interrupt\n");
-		return IRQ_HANDLED;
-	}
+	if (!idev->buf)
+		return IRQ_NONE;
 
 	switch (status) {
 	case STATUS_M_START_SENT:
 	case STATUS_M_REPEATED_START_SENT:
-		ctrl = readl(idev->base + CORE_I2C_CTRL);
+		ctrl = readb(idev->base + CORE_I2C_CTRL);
 		ctrl &= ~CTRL_STA;
-		writel(idev->addr, idev->base + CORE_I2C_DATA);
-		writel(ctrl, idev->base + CORE_I2C_CTRL);
+		writeb(idev->addr, idev->base + CORE_I2C_DATA);
+		writeb(ctrl, idev->base + CORE_I2C_CTRL);
 		if (idev->msg_len <= 0)
 			goto finished;
 		break;
@@ -265,13 +263,13 @@ static irqreturn_t mchp_corei2c_handle_isr(struct mchp_corei2c_dev *idev)
 		idev->msg_err = -ENXIO;
 		goto last_byte;
 	case STATUS_M_SLAR_ACK:
-		ctrl = readl(idev->base + CORE_I2C_CTRL);
+		ctrl = readb(idev->base + CORE_I2C_CTRL);
 		if (idev->msg_len == 1u) {
 			ctrl &= ~CTRL_AA;
-			writel(ctrl, idev->base + CORE_I2C_CTRL);
+			writeb(ctrl, idev->base + CORE_I2C_CTRL);
 		} else {
 			ctrl |= CTRL_AA;
-			writel(ctrl, idev->base + CORE_I2C_CTRL);
+			writeb(ctrl, idev->base + CORE_I2C_CTRL);
 		}
 		if (idev->msg_len < 1u)
 			goto last_byte;
@@ -304,16 +302,16 @@ static irqreturn_t mchp_corei2c_isr(int irq, void *_dev)
 	irqreturn_t ret = IRQ_NONE;
 	u8 ctrl;
 
-	ctrl = readl(idev->base + CORE_I2C_CTRL);
+	ctrl = readb(idev->base + CORE_I2C_CTRL);
 	if (ctrl & CTRL_SI) {
-		idev->isr_status = readl(idev->base + CORE_I2C_STATUS);
+		idev->isr_status = readb(idev->base + CORE_I2C_STATUS);
 		ret = mchp_corei2c_handle_isr(idev);
 	}
 
 	/* Clear the si flag */
-	ctrl = readl(idev->base + CORE_I2C_CTRL);
+	ctrl = readb(idev->base + CORE_I2C_CTRL);
 	ctrl &= ~CTRL_SI;
-	writel(ctrl, idev->base + CORE_I2C_CTRL);
+	writeb(ctrl, idev->base + CORE_I2C_CTRL);
 
 	return ret;
 }
@@ -336,9 +334,9 @@ static int mchp_corei2c_xfer_msg(struct mchp_corei2c_dev *idev, struct i2c_msg *
 
 	mchp_corei2c_core_enable(idev);
 
-	ctrl = readl(idev->base + CORE_I2C_CTRL);
+	ctrl = readb(idev->base + CORE_I2C_CTRL);
 	ctrl |= CTRL_STA;
-	writel(ctrl, idev->base + CORE_I2C_CTRL);
+	writeb(ctrl, idev->base + CORE_I2C_CTRL);
 
 	time_left = wait_for_completion_timeout(&idev->msg_complete, MICROCHIP_I2C_TIMEOUT);
 	if (!time_left)
@@ -417,8 +415,10 @@ static int mchp_corei2c_probe(struct platform_device *pdev)
 		return dev_err_probe(&pdev->dev, ret, "failed to enable clock\n");
 
 	ret = mchp_corei2c_init(idev);
-	if (ret)
+	if (ret) {
+		clk_disable_unprepare(idev->i2c_clk);
 		return dev_err_probe(&pdev->dev, ret, "failed to program clock divider\n");
+	}		
 
 	i2c_set_adapdata(&idev->adapter, idev);
 	snprintf(idev->adapter.name, sizeof(idev->adapter.name),  "Microchip I2C hw bus");
