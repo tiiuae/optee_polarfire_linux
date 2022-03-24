@@ -62,12 +62,10 @@
 
 		contextb_reserved: contextb_reserved@0x1075BB0000 {
 			reg = <0x10 0x75BB0000 0x0 0x400000>;
-			no-map;
 		};
 
 		rpmsg_vrings_reserved: rpmsg_vrings@0x1075FB0000 {
 			reg = <0x10 0x75FB0000 0x0 0x10000>;
-			no-map;
 		};
 
 		rpmsg_dma_reserved: rpmsg_dma@0x1075FC0000 {
