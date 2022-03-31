@@ -26,6 +26,10 @@
 		gpio1 = &gpio0;
 	};
 
+	chosen {
+		stdout-path = "serial1:115200n8";
+	};
+
 	cpus {
 		timebase-frequency = <RTCCLK_FREQ>;
 	};
