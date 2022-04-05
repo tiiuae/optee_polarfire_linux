@@ -12,7 +12,7 @@
 #define RTCCLK_FREQ		1000000
 
 / {
-	model = "Microchip PolarFire-SoC Icicle Kit";
+	model = "Aries Embedded m100pfs-evp";
 	compatible = "aries,m100pfsevp-emmc", "microchip,mpfs";
 
 	aliases {
@@ -22,6 +22,8 @@
 		serial2 = &mmuart2;
 		serial3 = &mmuart3;
 		serial4 = &mmuart4;
+		gpio0 = &gpio0;
+		gpio1 = &gpio2;
 	};
 
 	chosen {
