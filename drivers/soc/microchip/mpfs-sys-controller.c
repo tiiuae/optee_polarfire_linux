@@ -167,10 +167,8 @@ struct mpfs_sys_controller *mpfs_sys_controller_get(struct device *dev)
 		goto err_bad_device;
 
 	ret = devm_add_action_or_reset(dev, mpfs_sys_controller_put, sys_controller);
-	if (ret) {
-		kref_put(&sys_controller->consumers, mpfs_sys_controller_delete);
+	if (ret)
 		return ERR_PTR(ret);
-	}
 
 	return sys_controller;
 
