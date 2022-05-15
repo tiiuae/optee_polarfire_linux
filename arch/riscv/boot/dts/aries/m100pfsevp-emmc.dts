@@ -16,7 +16,8 @@
 	compatible = "aries,m100pfsevp-emmc", "microchip,mpfs";
 
 	aliases {
-		ethernet0 = &mac1;
+		ethernet0 = &mac0;
+		ethernet1 = &mac1;
 		serial0 = &mmuart0;
 		serial1 = &mmuart1;
 		serial2 = &mmuart2;
@@ -75,6 +76,7 @@
 	cap-mmc-highspeed;
 	no-1-8-v;
 	non-removable;
+	disable-wp;
 	status = "okay";
 };
 
@@ -113,7 +115,8 @@
 };
 
 &mac0 {
-	phy-mode = "sgmii";
+	status = "okay";
+	phy-mode = "gmii";
 	phy-handle = <&phy0>;
 	phy0: ethernet-phy@0 {
 		reg = <0>;
@@ -123,7 +126,7 @@
 
 &mac1 {
 	status = "okay";
-	phy-mode = "sgmii";
+	phy-mode = "gmii";
 	phy-handle = <&phy1>;
 	phy1: ethernet-phy@0 {
 		reg = <0>;
