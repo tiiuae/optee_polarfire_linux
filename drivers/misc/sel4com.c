@@ -15,6 +15,9 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/atomic.h>
+#include <linux/spinlock.h>
+#include <linux/circ_buf.h>
+#include <linux/minmax.h>
 
 #define DT_COMM_CTRL		"ctrl"
 #define DT_REE2TEE_NAME		"ree2tee"
@@ -30,31 +33,140 @@ struct tee_comm_ctrl {
 	int32_t head;
 	int32_t tail;
 };
-/***************************************/
 
 struct tee_comm_ch {
 	struct tee_comm_ctrl *ctrl;
-	size_t buf_len;
+	int32_t buf_len;
 	char *buf;
 };
+/***************************************/
 
 struct sel4com {
 	struct tee_comm_ch ree2tee;
 	struct tee_comm_ch tee2ree;
 };
 
+static DEFINE_SPINLOCK(writer_lock);
+static DEFINE_SPINLOCK(reader_lock);
+
+/*
+ * Design copied from producer example: linux/Documentation/core-api/circular-buffers.rst
+ */
+static int write_to_circ(struct tee_comm_ch *circ, int32_t data_len,
+			 const char *data_in)
+{
+	int ret = -ENOSPC;
+	int32_t head = 0;
+	int32_t tail = 0;
+	int32_t buf_end = 0;
+	int32_t write_ph1 = 0;
+	int32_t wrap = 0;
+
+	spin_lock(&writer_lock);
+
+	head = circ->ctrl->head;
+
+	/* The spin_unlock() and next spin_lock() provide needed ordering. */
+	tail = READ_ONCE(circ->ctrl->tail);
+
+	/* Shrink consecutive writes to the buffer end */
+	buf_end = CIRC_SPACE_TO_END(head, tail, circ->buf_len);
+	write_ph1 = min(buf_end, data_len);
+
+	/* Remaining data if wrap needed, otherwise zero */
+	wrap = data_len - write_ph1;
+
+	if (CIRC_SPACE(head, tail, circ->buf_len) >= data_len) {
+		memcpy(&circ->buf[head], data_in, write_ph1);
+
+		/* Head will be automatically rolled back to the beginning of the buffer */
+		head = (head + write_ph1) & (circ->buf_len - 1);
+
+		if (wrap) {
+			memcpy(&circ->buf[head], &data_in[write_ph1], wrap);
+			head = (head + wrap) & (circ->buf_len - 1);
+		}
+
+		/* update the head after buffer write */
+		smp_store_release(&circ->ctrl->head, head);
+
+		/* TODO: wakeup reader */
+		ret = 0;
+	}
+
+	spin_unlock(&writer_lock);
+
+	return ret;
+}
+
+/*
+ * Design copied from consumer example: linux/Documentation/core-api/circular-buffers.rst
+ */
+static int read_from_circ(struct tee_comm_ch *circ, int32_t out_len,
+			  char *out_buf, int32_t *read_len)
+{
+	int ret = -ENODATA;
+	int32_t head = 0;
+	int32_t tail = 0;
+	int32_t available = 0;
+	int32_t buf_end = 0;
+	int32_t read_ph1 = 0;
+	int32_t wrap = 0;
+
+	spin_lock(&reader_lock);
+
+	/* Read index before reading contents at that index. */
+	head = smp_load_acquire(&circ->ctrl->head);
+	tail = circ->ctrl->tail;
+
+	/* Shrink read length to output buffer size */
+	available = min(out_len, CIRC_CNT(head, tail, circ->buf_len));
+
+	/* Shrink consecutive reads to the buffer end */
+	buf_end = CIRC_CNT_TO_END(head, tail, circ->buf_len);
+	read_ph1 = min(available, buf_end);
+
+	/* Remaining data if wrap needed, otherwise zero */
+	wrap = available - read_ph1;
+
+	*read_len = 0;
+
+	if (available >= 1) {
+		memcpy(out_buf, &circ->buf[tail], read_ph1);
+		tail = (tail + read_ph1) & (circ->buf_len - 1);
+
+		*read_len = read_ph1;
+
+		if (wrap) {
+			memcpy(&out_buf[read_ph1], &circ->buf[tail], wrap);
+			tail = (tail + wrap) & (circ->buf_len - 1);
+			*read_len += wrap;
+		}
+
+		/* Finish reading descriptor before incrementing tail. */
+		smp_store_release(&circ->ctrl->tail, tail);
+
+		ret = 0;
+	}
+
+	spin_unlock(&reader_lock);
+
+	return ret;
+}
+
 static ssize_t diag_show(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
 	int pos = 0;
 	struct sel4com *priv = dev_get_drvdata(dev);
-	pos += sysfs_emit_at(buf, pos, "REE->TEE\n");
+
+	pos += sysfs_emit_at(buf, pos, "\nREE->TEE\n");
 	pos += sysfs_emit_at(buf, pos, "ree_magic: 0x%x\n", priv->ree2tee.ctrl->ree_magic);
 	pos += sysfs_emit_at(buf, pos, "tee_magic: 0x%x\n", priv->ree2tee.ctrl->tee_magic);
 	pos += sysfs_emit_at(buf, pos, "head: %d\n", priv->ree2tee.ctrl->head);
 	pos += sysfs_emit_at(buf, pos, "tail: %d\n", priv->ree2tee.ctrl->tail);
 
-	pos += sysfs_emit_at(buf, pos, "TEE->REE\n");
+	pos += sysfs_emit_at(buf, pos, "\nTEE->REE\n");
 	pos += sysfs_emit_at(buf, pos, "ree_magic: 0x%x\n", priv->tee2ree.ctrl->ree_magic);
 	pos += sysfs_emit_at(buf, pos, "tee_magic: 0x%x\n", priv->tee2ree.ctrl->tee_magic);
 	pos += sysfs_emit_at(buf, pos, "head: %d\n", priv->tee2ree.ctrl->head);
@@ -64,8 +176,44 @@ static ssize_t diag_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(diag);
 
+static ssize_t write_tee_store(struct device *dev, struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	int err = -1;
+	struct sel4com *priv = dev_get_drvdata(dev);
+
+	dev_info(dev, "write %ld", count);
+
+	err = write_to_circ(&priv->ree2tee, count, buf);
+	if (err)
+		count = err;
+
+	return count;
+}
+
+static DEVICE_ATTR_WO(write_tee);
+
+static ssize_t read_tee_show(struct device *dev, struct device_attribute *attr,
+			 char *buf)
+{
+	int err = -1;
+	int32_t pos = 0;
+	struct sel4com *priv = dev_get_drvdata(dev);
+
+	err = read_from_circ(&priv->tee2ree, PAGE_SIZE, buf, &pos);
+	if (err)
+		return err;
+
+	dev_info(dev, "read %d", pos);
+
+	return pos;
+}
+static DEVICE_ATTR_RO(read_tee);
+
 static struct attribute *sel4com_sysfs_attrs[] = {
 	&dev_attr_diag.attr,
+	&dev_attr_write_tee.attr,
+	&dev_attr_read_tee.attr,
 	NULL
 };
 
