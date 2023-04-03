@@ -93,6 +93,9 @@ static irqreturn_t ihc_isr(int irq, void *data)
 	struct mbox_chan *chan = (struct mbox_chan *)data;
 	struct miv_ihc *ihc = mbox_chan_to_ihc(chan);
 
+	/* Init recv buffer to detect and skip non-IHC IRQs */
+	memset(ihc->buf_base, 0xFF, sizeof(struct ihc_sbi_msg));
+
 	ret = ihc_sbi_send(SBI_EXT_IHC_RX, ihc->remote_context_id, ihc->dma_addr);
 
 	if(unlikely(ret < 0))
@@ -105,7 +108,7 @@ static irqreturn_t ihc_isr(int irq, void *data)
 
  	if (sbi_rx_msg.irq_type == IHC_MP_IRQ) {
 		mbox_chan_received_data(&ihc->channel, &sbi_rx_msg.ihc_msg);
-	} else {
+	} else if (sbi_rx_msg.irq_type == IHC_ACK_IRQ) {
 		mbox_chan_txdone(&ihc->channel, 0);
 	}
 
