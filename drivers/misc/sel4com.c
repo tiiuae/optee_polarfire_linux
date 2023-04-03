@@ -18,6 +18,8 @@
 #include <linux/spinlock.h>
 #include <linux/circ_buf.h>
 #include <linux/minmax.h>
+#include <linux/miscdevice.h>
+#include <linux/fs.h>
 
 #define DT_COMM_CTRL		"ctrl"
 #define DT_REE2TEE_NAME		"ree2tee"
@@ -44,10 +46,15 @@ struct tee_comm_ch {
 struct sel4com {
 	struct tee_comm_ch ree2tee;
 	struct tee_comm_ch tee2ree;
+
+	struct device *dev;
+	struct miscdevice sel4com_dev;
 };
 
 static DEFINE_SPINLOCK(writer_lock);
 static DEFINE_SPINLOCK(reader_lock);
+
+#define TMP_BUF_SIZE		(4 * PAGE_SIZE)
 
 /*
  * Design copied from producer example: linux/Documentation/core-api/circular-buffers.rst
@@ -154,6 +161,97 @@ static int read_from_circ(struct tee_comm_ch *circ, int32_t out_len,
 	return ret;
 }
 
+static ssize_t sel4com_read(struct file *filep, char __user *userbuf,
+			    size_t len, loff_t *offset)
+{
+	ssize_t ret = 0;
+	int32_t read_bytes = 0;
+	size_t block = 0;
+
+	struct sel4com *priv =
+		container_of(filep->private_data, struct sel4com, sel4com_dev);
+
+	char *buf = vmalloc(TMP_BUF_SIZE);
+
+	if (!buf)
+		return -ENOMEM;
+
+	while (len > 0) {
+		block = min(len, TMP_BUF_SIZE);
+
+		/* read_from_circ returns error only when buffer is empty */
+		if (read_from_circ(&priv->tee2ree, block, buf, &read_bytes))
+			break;
+
+		if (copy_to_user(userbuf + ret, buf, read_bytes)) {
+			dev_err(priv->dev, "copy to userspace failed");
+			ret = -EFAULT;
+			break;
+		}
+
+		ret += read_bytes;
+		len -= read_bytes;
+	}
+
+	/* Return buffer empty if no data read */
+	if (ret == 0)
+		ret = -ENODATA;
+
+	vfree(buf);
+
+	dev_err(priv->dev, "read %ld\n", ret);
+
+	return ret;
+}
+
+static ssize_t sel4com_write(struct file *filep, const char __user *userbuf,
+			     size_t len, loff_t *offset)
+{
+	ssize_t ret = 0;
+	size_t block = 0;
+
+	struct sel4com *priv =
+		container_of(filep->private_data, struct sel4com, sel4com_dev);
+
+	char *buf = vmalloc(TMP_BUF_SIZE);
+
+	if (!buf)
+		return -ENOMEM;
+
+	while (len > 0) {
+		block = min(len, TMP_BUF_SIZE);
+
+		if (copy_from_user(buf, userbuf + ret, block)) {
+			dev_err(priv->dev, "copy from userspace failed");
+			ret = -EFAULT;
+			break;
+		}
+
+		/* write_to_circ returns error only when buffer is full */
+		if (write_to_circ(&priv->ree2tee, block, buf))
+			break;
+
+		len -= block;
+		ret += block;
+	}
+
+	/* Return buffer full if no data written */
+	if (ret == 0)
+		ret = -ENOSPC;
+
+	vfree(buf);
+
+	dev_err(priv->dev, "write %ld\n", ret);
+
+	return ret;
+}
+
+static const struct file_operations sel4com_fops = {
+	.owner = THIS_MODULE,
+	.read = sel4com_read,
+	.write = sel4com_write,
+};
+
 static ssize_t diag_show(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
@@ -176,44 +274,8 @@ static ssize_t diag_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(diag);
 
-static ssize_t write_tee_store(struct device *dev, struct device_attribute *attr,
-			    const char *buf, size_t count)
-{
-	int err = -1;
-	struct sel4com *priv = dev_get_drvdata(dev);
-
-	dev_info(dev, "write %ld", count);
-
-	err = write_to_circ(&priv->ree2tee, count, buf);
-	if (err)
-		count = err;
-
-	return count;
-}
-
-static DEVICE_ATTR_WO(write_tee);
-
-static ssize_t read_tee_show(struct device *dev, struct device_attribute *attr,
-			 char *buf)
-{
-	int err = -1;
-	int32_t pos = 0;
-	struct sel4com *priv = dev_get_drvdata(dev);
-
-	err = read_from_circ(&priv->tee2ree, PAGE_SIZE, buf, &pos);
-	if (err)
-		return err;
-
-	dev_info(dev, "read %d", pos);
-
-	return pos;
-}
-static DEVICE_ATTR_RO(read_tee);
-
 static struct attribute *sel4com_sysfs_attrs[] = {
 	&dev_attr_diag.attr,
-	&dev_attr_write_tee.attr,
-	&dev_attr_read_tee.attr,
 	NULL
 };
 
@@ -320,6 +382,8 @@ static int sel4com_probe(struct platform_device *pdev)
 	if (!priv)
 		return -ENOMEM;
 
+	priv->dev = &pdev->dev;
+
 	platform_set_drvdata(pdev, priv);
 
 	err = sel4com_ch_setup(&pdev->dev, priv);
@@ -334,14 +398,29 @@ static int sel4com_probe(struct platform_device *pdev)
 		return err;
 	}
 
+	priv->sel4com_dev.minor = MISC_DYNAMIC_MINOR;
+	priv->sel4com_dev.name = "sel4com";
+	priv->sel4com_dev.fops = &sel4com_fops;
+
+	err = misc_register(&priv->sel4com_dev);
+	if (err) {
+		dev_err(&pdev->dev, "misc device register failed %d", err);
+		return err;
+	}
+
+	dev_info(&pdev->dev,
+		"Successfully registered sel4 communication driver\n");
+
 	return err;
 }
 
 static int sel4com_remove(struct platform_device *pdev)
 {
-	int err = 0;
+	struct sel4com *priv = platform_get_drvdata(pdev);
 
-	return err;
+	misc_deregister(&priv->sel4com_dev);
+
+	return 0;
 }
 
 static const struct of_device_id sel4com_of_match[] = {
