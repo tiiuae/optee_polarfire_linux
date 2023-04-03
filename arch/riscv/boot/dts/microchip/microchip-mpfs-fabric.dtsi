@@ -22,7 +22,7 @@
 	ihc: ihc {
 		compatible = "microchip,miv-ihc";
 		interrupt-parent = <&plic>;
-		interrupts = <IHC_HART1_INT>;
+		interrupts = <IHC_HART2_INT>;
 		miv-ihc,remote-context-id = <IHC_CONTEXT_B>;
 		#mbox-cells = <1>;
 		status = "disabled";
