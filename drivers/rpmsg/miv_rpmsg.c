@@ -108,17 +108,18 @@ static bool miv_rpmsg_notify(struct virtqueue *vq)
 		return false;
 	}
 
-	if(rpvq->vq_id == rpvq->virdev->base_vq_id) {
-
+	if (rpvq->vq_id == rpvq->virdev->base_vq_id) {
 		/* If start-up, kick the rvq to tell the remote processor it
-		can start sending messages */
-		if(!rpvq->rpdev->initialized) {
+		 * can start sending messages
+		 */
+		if (!rpvq->rpdev->initialized) {
 			rpvq->rpdev->initialized = true;
 		} else {
-		/* If already initialized, do not notify/kick each time rx buffers 
-		are consumed, since we are already sending an ACK using the 
-		Inter-hart communication (IHC) driver. The RPMsg-lite on the 
-		remote side has the RL_ALLOW_CONSUMED_BUFFERS_NOTIFICATION set to 0*/ 
+			/* If already initialized, do not notify/kick each time rx buffers
+			 * are consumed, since we are already sending an ACK using the
+			 * Inter-hart communication (IHC) driver. The RPMsg-lite on the
+			 * remote side has the RL_ALLOW_CONSUMED_BUFFERS_NOTIFICATION set to 0
+			 */
 			return true;
 		}
 	}
@@ -188,6 +189,7 @@ static int set_vring_phy_buf(struct platform_device *pdev,
 	resource_size_t size;
 	unsigned int start, end;
 	int i, ret = 0;
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (res) {
 		size = resource_size(res);
@@ -236,9 +238,10 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
 	memset_io(rpvq->addr, 0, RPMSG_RING_SIZE);
 
 	vq = vring_new_virtqueue(index, RPMSG_NUM_BUFS / 2, RPMSG_VRING_ALIGN,
-			vdev, false, ctx, rpvq->addr, miv_rpmsg_notify, callback, name);
+				 vdev, false, ctx, rpvq->addr, miv_rpmsg_notify,
+				 callback, name);
 	if (!vq) {
-		dev_err(&vdev->dev,"vring_new_virtqueue failed\n");
+		dev_err(&vdev->dev, "vring_new_virtqueue failed\n");
 		err = -ENOMEM;
 		goto unmap_vring;
 	}
@@ -283,6 +286,7 @@ static void miv_rpmsg_del_vqs(struct virtio_device *vdev)
 						       virdev->base_vq_id / 2);
 	list_for_each_entry_safe(vq, n, &vdev->vqs, list) {
 		struct miv_rpmsg_vq_info *rpvq = vq->priv;
+
 		iounmap(rpvq->addr);
 		vring_del_virtqueue(vq);
 		kfree(rpvq);
@@ -291,12 +295,11 @@ static void miv_rpmsg_del_vqs(struct virtio_device *vdev)
 		miv_rpmsg_unregister_nb(rpdev, &virdev->nb);
 }
 
-static int miv_rpmsg_find_vqs(struct virtio_device *vdev, unsigned nvqs,
-			       struct virtqueue *vqs[],
-			       vq_callback_t *callbacks[],
-			       const char * const names[],
-			       const bool *ctx,
-			       struct irq_affinity *desc)
+static int miv_rpmsg_find_vqs(struct virtio_device *vdev, unsigned int nvqs,
+			      struct virtqueue *vqs[],
+			      vq_callback_t *callbacks[],
+			      const char *const names[], const bool *ctx,
+			      struct irq_affinity *desc)
 {
 	int i, err;
 	struct miv_virdev *virdev = to_miv_virdev(vdev);
@@ -382,6 +385,7 @@ static void tx_done_callback(struct mbox_client *cl, void *mssg, int r)
 {
 	struct miv_rpmsg_vproc *rpmsg_vproc = container_of(cl,
 	struct miv_rpmsg_vproc, mbox_client);
+
 	complete(&rpmsg_vproc->c);
 }
 
@@ -416,30 +420,30 @@ static int miv_rpmsg_probe(struct platform_device *pdev)
 	BLOCKING_INIT_NOTIFIER_HEAD(&(rpdev->notifier));
 	INIT_WORK(&(rpdev->rpmsg_work), rpmsg_work_handler);
 
-	for(i =0; i <num_channels; i++){
-		rpdev->ivdev[i].mbox = mbox_request_channel(&rpdev->mbox_client, i);
+	for (i = 0; i < num_channels; i++) {
+		rpdev->ivdev[i].mbox =
+			mbox_request_channel(&rpdev->mbox_client, i);
 
 		if (IS_ERR(rpdev->ivdev[i].mbox)) {
-			dev_warn(&pdev->dev, "Failed to request mbox channel\n");
+			dev_warn(&pdev->dev,
+				 "Failed to request mbox channel\n");
 			return PTR_ERR(rpdev->ivdev[i].mbox);
 		}
 	}
 
 	ret = set_vring_phy_buf(pdev, rpdev, rpdev->vdev_nums);
 	if (ret) {
-		dev_err(dev,"No vring buffer.\n");
+		dev_err(dev, "No vring buffer.\n");
 		return -ENOMEM;
 	}
 
 	ret = of_reserved_mem_device_init(dev);
-	if (ret) {
+	if (ret)
 		dev_err(&pdev->dev, "init reserved memory failed\n");
-	}
 
 	for (i = 0; i < rpdev->vdev_nums; i++) {
 		dev_info(&pdev->dev, "%s vdev%d: vring0 0x%x, vring1 0x%x\n",
-			 __func__, rpdev->vdev_nums,
-			 rpdev->ivdev[i].vring[0],
+			 __func__, rpdev->vdev_nums, rpdev->ivdev[i].vring[0],
 			 rpdev->ivdev[i].vring[1]);
 		rpdev->ivdev[i].vdev.id.device = VIRTIO_ID_RPMSG;
 		rpdev->ivdev[i].vdev.config = &miv_rpmsg_config_ops;
@@ -450,7 +454,7 @@ static int miv_rpmsg_probe(struct platform_device *pdev)
 		ret = register_virtio_device(&rpdev->ivdev[i].vdev);
 		if (ret) {
 			dev_err(dev, "%s failed to register rpdev: %d\n",
-					__func__, ret);
+				__func__, ret);
 			return ret;
 		}
 	}
