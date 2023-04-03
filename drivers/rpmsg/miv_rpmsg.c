@@ -96,7 +96,7 @@ static struct miv_rpmsg_vproc miv_rpmsg_vproc[] = {
 static bool miv_rpmsg_notify(struct virtqueue *vq)
 {
 	int ret;
-	struct miv_ihc_msg mbox_msg;
+	struct miv_ihc_msg mbox_msg = { 0 };
 	struct virtio_device *vdev;
 	struct miv_rpmsg_vq_info *rpvq = vq->priv;
 	struct mbox_chan *mbox_chan = rpvq->virdev->mbox;
