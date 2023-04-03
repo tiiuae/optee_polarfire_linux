@@ -46,10 +46,10 @@ struct miv_ihc {
 	struct device		*dev;
 	struct mbox_controller	controller;
 	struct mbox_chan	channel;
-	int 			irq;
-	dma_addr_t 		dma_addr;
-	void 			*buf_base;
-	u32 			remote_context_id;
+	int			irq;
+	dma_addr_t		dma_addr;
+	void			*buf_base;
+	u32			remote_context_id;
 };
 
 int ihc_sbi_send(u32 command, u32 remote_context_id, dma_addr_t address)
@@ -98,19 +98,17 @@ static irqreturn_t ihc_isr(int irq, void *data)
 
 	ret = ihc_sbi_send(SBI_EXT_IHC_RX, ihc->remote_context_id, ihc->dma_addr);
 
-	if(unlikely(ret < 0))
-	{
+	if (unlikely(ret < 0)) {
 		dev_warn_ratelimited(ihc->dev, "incorrect remote context ID\n");
 		return IRQ_NONE;
 	}
 
 	memcpy(&sbi_rx_msg, ihc->buf_base, sizeof(struct ihc_sbi_msg));
 
- 	if (sbi_rx_msg.irq_type == IHC_MP_IRQ) {
+	if (sbi_rx_msg.irq_type == IHC_MP_IRQ)
 		mbox_chan_received_data(&ihc->channel, &sbi_rx_msg.ihc_msg);
-	} else if (sbi_rx_msg.irq_type == IHC_ACK_IRQ) {
+	else if (sbi_rx_msg.irq_type == IHC_ACK_IRQ)
 		mbox_chan_txdone(&ihc->channel, 0);
-	}
 
 	return IRQ_HANDLED;
 }
@@ -162,7 +160,7 @@ static int ihc_probe(struct platform_device *pdev)
 	struct dma_pool *pool;
 	int ret;
 
- 	ret = sbi_probe_extension(SBI_EXT_MICROCHIP_TECHNOLOGY);
+	ret = sbi_probe_extension(SBI_EXT_MICROCHIP_TECHNOLOGY);
 	if (ret <= 0) {
 		dev_err(&pdev->dev, "SBI IHC extension not detected\n");
 		goto fail;
@@ -175,9 +173,8 @@ static int ihc_probe(struct platform_device *pdev)
 	}
 
 	ret = of_property_read_u32(np, "miv-ihc,remote-context-id", &ihc->remote_context_id);
-	if (ret) {
+	if (ret)
 		dev_err(dev, "missing miv-ihc,remote-context-id property\n");
-	}
 
 	ret = ihc_sbi_init(ihc->remote_context_id);
 	if (ret < 0) {
