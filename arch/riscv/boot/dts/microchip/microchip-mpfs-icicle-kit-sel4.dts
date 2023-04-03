@@ -146,6 +146,20 @@
 			label = "fabricbuf2-ddr-nc-wcb";
 		};
 	};
+
+	teeos_comm {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		compatible = "sel4,teeos-comm";
+		ranges;
+		ree2tee@ada00000 {
+			reg = <0x0 0xada00000 0x0 0x80000>;
+		};
+		tee2ree@ada80000 {
+			reg = <0x0 0xada80000 0x0 0x80000>;
+		};
+	};
+
 	L44: soc {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -157,7 +171,7 @@
 		*/
 		DDRC_CACHE_LO: memory@89000000 {
 			device_type = "memory";
-			reg = <0x0 0x89000000 0x0 0x24B00000>;
+			reg = <0x0 0x89000000 0x0 0x24A00000>;
 			clocks = <&clkcfg CLK_DDRC>;
 			status = "okay";
 		};
