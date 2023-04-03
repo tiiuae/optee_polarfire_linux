@@ -11,10 +11,6 @@
 /delete-node/ &ddrc_cache_lo;
 
 / {
-	chosen {
-		stdout-path = "mmuart2:115200n8";
-	};
-
 	/* TODO: move DMA etc. areas to the end of ddr_lo region
 	   to have continous RAM range */
 	ddrc_cache_lo: memory@89000000 {
@@ -41,23 +37,7 @@
 	};
 };
 
-&cpu1 {
-	status = "disabled"; /* seL4 */
-};
-
-&cpu2 {
-	status = "okay";
-};
-
-&cpu3 {
-	status = "okay";
-};
-
-&cpu4 {
-	status = "okay";
-};
-
-&mmuart1 {
+&mmuart2 {
 	status = "disabled"; /* seL4 */
 };
 
