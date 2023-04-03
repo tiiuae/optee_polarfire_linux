@@ -19,22 +19,6 @@
 		clocks = <&clkcfg CLK_DDRC>;
 		status = "okay";
 	};
-
-	teeos_comm {
-		#address-cells = <2>;
-		#size-cells = <2>;
-		compatible = "sel4,teeos-comm";
-		ranges;
-		ctrl@ad9ff000 {
-			reg = <0x0 0xad9ff000 0x0 0x1000>;
-		};
-		ree2tee@ada00000 {
-			reg = <0x0 0xada00000 0x0 0x80000>;
-		};
-		tee2ree@ada80000 {
-			reg = <0x0 0xada80000 0x0 0x80000>;
-		};
-	};
 };
 
 &mmuart2 {
