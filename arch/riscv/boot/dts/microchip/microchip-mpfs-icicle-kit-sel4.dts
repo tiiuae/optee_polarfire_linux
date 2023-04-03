@@ -11,6 +11,19 @@
 /delete-node/ &ddrc_cache_lo;
 
 / {
+	/*
+	 * Reserved memory area for seL4 crashlog.
+	 * CIRC-header + power of 2 payload buffer
+	 *
+	 * TODO: U-boot fails to load DTB if this is added
+	 * to reserved memory area where it belongs.
+	 */
+	sel4_crashlog: sel4_crashlog@a2450000 {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		reg = <0x0 0xa2450000 0x0 0x2000>;
+	};
+
 	/* TODO: move DMA etc. areas to the end of ddr_lo region
 	   to have continous RAM range */
 	ddrc_cache_lo: memory@89000000 {
