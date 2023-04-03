@@ -445,6 +445,12 @@ config HISI_HIKEY_USB
 	  switching between the dual-role USB-C port and the USB-A host ports
 	  using only one USB controller.
 
+config SEL4_COMM
+	bool "seL4 TEE OS communication channel"
+	help
+	  This driver provides shared memory based communication channel
+	  with seL4 TEE OS.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
