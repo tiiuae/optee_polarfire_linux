@@ -132,7 +132,7 @@ static bool miv_rpmsg_notify(struct virtqueue *vq)
 	ret = mbox_send_message(mbox_chan, &mbox_msg);
 
 	/* mbox_send_message returns non-negative value on success*/
-	if (ret > 0)
+	if (ret >= 0)
 		wait_for_completion(&rpvq->rpdev->c);
 
 	mutex_unlock(&rpvq->rpdev->lock);
