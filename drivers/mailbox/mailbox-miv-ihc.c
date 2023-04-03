@@ -47,8 +47,10 @@ struct miv_ihc {
 	struct mbox_controller	controller;
 	struct mbox_chan	channel;
 	int			irq;
-	dma_addr_t		dma_addr;
-	void			*buf_base;
+	dma_addr_t		write_dma;
+	dma_addr_t		read_dma;
+	void			*write_buf;
+	void			*read_buf;
 	u32			remote_context_id;
 };
 
@@ -94,16 +96,17 @@ static irqreturn_t ihc_isr(int irq, void *data)
 	struct miv_ihc *ihc = mbox_chan_to_ihc(chan);
 
 	/* Init recv buffer to detect and skip non-IHC IRQs */
-	memset(ihc->buf_base, 0xFF, sizeof(struct ihc_sbi_msg));
+	memset(ihc->read_buf, 0xFF, sizeof(struct ihc_sbi_msg));
 
-	ret = ihc_sbi_send(SBI_EXT_IHC_RX, ihc->remote_context_id, ihc->dma_addr);
+	ret = ihc_sbi_send(SBI_EXT_IHC_RX, ihc->remote_context_id,
+			   ihc->read_dma);
 
 	if (unlikely(ret < 0)) {
 		dev_warn_ratelimited(ihc->dev, "incorrect remote context ID\n");
 		return IRQ_NONE;
 	}
 
-	memcpy(&sbi_rx_msg, ihc->buf_base, sizeof(struct ihc_sbi_msg));
+	memcpy(&sbi_rx_msg, ihc->read_buf, sizeof(struct ihc_sbi_msg));
 
 	if (sbi_rx_msg.irq_type == IHC_MP_IRQ)
 		mbox_chan_received_data(&ihc->channel, &sbi_rx_msg.ihc_msg);
@@ -119,9 +122,10 @@ static int ihc_send_data(struct mbox_chan *chan, void *data)
 	struct miv_ihc *ihc = mbox_chan_to_ihc(chan);
 	struct ihc_msg *message = data;
 
-	memcpy(ihc->buf_base, message, sizeof(struct miv_ihc_msg));
+	memcpy(ihc->write_buf, message, sizeof(struct miv_ihc_msg));
 
-	ret = ihc_sbi_send(SBI_EXT_IHC_TX, ihc->remote_context_id, ihc->dma_addr);
+	ret = ihc_sbi_send(SBI_EXT_IHC_TX, ihc->remote_context_id,
+			   ihc->write_dma);
 
 	return ret;
 }
@@ -204,17 +208,22 @@ static int ihc_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	pool = dma_pool_create("ihc", dev, IHC_MAX_MESSAGE_SIZE, 0, 0);
+	pool = dma_pool_create("ihc", dev, sizeof(struct ihc_sbi_msg), 0, 0);
 	if (!pool) {
 		ret = -ENOMEM;
 		goto fail;
 	}
 
-	ihc->buf_base = dma_pool_alloc(pool,
-				       GFP_KERNEL, &ihc->dma_addr);
-	if (!ihc->buf_base) {
+	ihc->write_buf = dma_pool_alloc(pool, GFP_KERNEL, &ihc->write_dma);
+	if (!ihc->write_buf) {
 		ret = -ENOMEM;
-		goto fail_dealloc;
+		goto fail_dealloc_pool;
+	}
+
+	ihc->read_buf = dma_pool_alloc(pool, GFP_KERNEL, &ihc->read_dma);
+	if (!ihc->read_buf) {
+		ret = -ENOMEM;
+		goto fail_dealloc_write;
 	}
 
 	ret = devm_mbox_controller_register(ihc->dev, &ihc->controller);
@@ -227,10 +236,11 @@ static int ihc_probe(struct platform_device *pdev)
 
 	return 0;
 
-fail_dealloc:
-	dma_pool_free(pool,
-		      ihc->buf_base, ihc->dma_addr);
-	ihc->buf_base = NULL;
+fail_dealloc_write:
+	dma_pool_free(pool, ihc->write_buf, ihc->write_dma);
+	ihc->write_buf = NULL;
+fail_dealloc_pool:
+	dma_pool_destroy(pool);
 fail:
 	return ret;
 }
